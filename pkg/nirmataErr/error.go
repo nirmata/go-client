@@ -12,7 +12,7 @@ type Error interface {
 	// Satisfy the generic error interface.
 	error
 
-	// Returns the short phrase depicting the classification of the error.
+	// Returns the short phrase
 	Code() string
 
 	// Returns the error details message.
@@ -25,14 +25,12 @@ type Error interface {
 // BatchError is a batch of errors which also wraps lower level errors with
 // code, message, and original errors. Calling Error() will include all errors
 // that occurred in the batch.
-//
-// Deprecated: Replaced with BatchedErrors. Only defined for backwards
-// compatibility.
+
 type BatchError interface {
 	// Satisfy the generic error interface.
 	error
 
-	// Returns the short phrase depicting the classification of the error.
+	// Returns the short phrase
 	Code() string
 
 	// Returns the error details message.

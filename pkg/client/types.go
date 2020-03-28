@@ -1,4 +1,4 @@
-package nirmataerr
+package client
 
 import (
 	"encoding/hex"

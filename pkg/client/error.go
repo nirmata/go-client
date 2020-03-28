@@ -1,5 +1,5 @@
-// Package nirmataerror represents API error interface accessors for the SDK.
-package nirmataerr
+// Package client represents API error interface accessors for the SDK.
+package client
 
 // An Error wraps lower level errors with code, message and an original error.
 // The underlying concrete error type may also satisfy other interfaces which

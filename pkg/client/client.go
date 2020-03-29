@@ -152,30 +152,30 @@ func removeSlash(path string) string {
 func (c *client) get(rawURL string) ([]byte, int, Error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, 0, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, 0, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
-		return nil, 0, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, 0, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, 0, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, 0, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, 0, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		glog.V(1).Infof("HTTP %d '%s': %s", resp.StatusCode, resp.Status, string(b))
-		return b, resp.StatusCode, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+		return b, resp.StatusCode, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -213,7 +213,7 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
@@ -221,13 +221,13 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -236,12 +236,12 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		obj, err := ParseObject(b)
 		if err != nil {
-			return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 		}
 		return obj, nil
 	}
 
-	return nil, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
 func (c *client) GetRelationID(id ID, name string) (ID, error) {
@@ -251,7 +251,7 @@ func (c *client) GetRelationID(id ID, name string) (ID, error) {
 	}
 	dataID, parseErr := ParseID(b)
 	if parseErr != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", parseErr)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), parseErr)
 	}
 	return dataID, nil
 }
@@ -264,7 +264,7 @@ func (c *client) GetRelation(id ID, name string) (map[string]interface{}, error)
 
 	data, parseErr := ParseCollection(b)
 	if parseErr != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", parseErr)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), parseErr)
 	}
 
 	if len(data) < 1 {
@@ -282,7 +282,7 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 	u := uBldr.Build()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
@@ -290,13 +290,13 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -306,7 +306,7 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return b, nil
 	}
 
-	return nil, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 
 }
 
@@ -324,7 +324,7 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 	u := uBldr.Build()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
@@ -332,13 +332,13 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -347,12 +347,12 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		parseBody, err := ParseCollection(b)
 		if err != nil {
-			return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 		}
 		return parseBody, nil
 	}
 
-	return nil, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
 func (c *client) Delete(id ID, params map[string]string) error {
@@ -377,7 +377,7 @@ func (c *client) DeleteURL(service Service, path string) Error {
 func (c *client) delete(u string) Error {
 	req, err := http.NewRequest("DELETE", u, nil)
 	if err != nil {
-		return NewError("ErrInternal", "Something goes wrong", err)
+		return NewError("ErrInternal", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
@@ -385,13 +385,13 @@ func (c *client) delete(u string) Error {
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -401,7 +401,7 @@ func (c *client) delete(u string) Error {
 		return nil
 	}
 
-	return NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
 func (c *client) GetCollection(service Service, modelIndex string, opts *GetOptions) ([]map[string]interface{}, Error) {
@@ -418,7 +418,7 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 	u := ubldr.Build()
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
@@ -426,13 +426,13 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 	glog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
 	b, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	glog.V(3).Infof("HTTP response %s - body[%d bytes]", resp.Status, len(b))
@@ -441,12 +441,12 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		body, err := ParseCollection(b)
 		if err != nil {
-			return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 		}
 		return body, nil
 	}
 
-	return nil, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
 func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
@@ -494,7 +494,7 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 
 	req, err := http.NewRequest(method, u, bytes.NewBuffer(b))
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	// set default headers before user supplied headers
@@ -528,7 +528,7 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 
 	resp, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
@@ -541,12 +541,12 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		obj, err := ParseObject(b)
 		if err != nil {
-			return nil, NewError("ErrHTTPInternal", "Something goes wrong", err)
+			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 		}
 		return obj, nil
 	}
 
-	return nil, NewError("ErrHTTPInternal", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
 func dumpRequest(request *http.Request) string {
@@ -609,7 +609,7 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 
 	obj, newObjectErr := NewObject(objs[0])
 	if newObjectErr != nil {
-		return nil, NewError("ErrInternal", "Something goes wrong", newObjectErr)
+		return nil, NewError("ErrInternal", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), newObjectErr)
 	}
 
 	return obj.ID(), nil

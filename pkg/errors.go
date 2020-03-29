@@ -1,4 +1,4 @@
-package nirmataerr
+package clienterr
 
 import "github.com/nirmata/go-client/pkg/client"
 

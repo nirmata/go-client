@@ -53,11 +53,11 @@ type BatchedErrors interface {
 	OrigErrs() []error
 }
 
-// New returns an Error object described by the code, message, and origErr.
+// NewError returns an Error object described by the code, message, and origErr.
 //
 // If origErr satisfies the Error interface it will not be wrapped within a new
 // Error object and will instead be returned.
-func New(code, message string, origErr error) Error {
+func NewError(code, message string, origErr error) Error {
 	var errs []error
 	if origErr != nil {
 		errs = append(errs, origErr)
@@ -107,7 +107,7 @@ type UnmarshalError interface {
 // the bytes that fail to unmarshal to the error.
 func NewUnmarshalError(err error, msg string, bytes []byte) UnmarshalError {
 	return &unmarshalError{
-		nirmataError: New("UnmarshalError", msg, err),
+		nirmataError: NewError("UnmarshalError", msg, err),
 		bytes:        bytes,
 	}
 }

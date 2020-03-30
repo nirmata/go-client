@@ -29,6 +29,9 @@ type RESTRequest struct {
 // Client provides access to the Nirmata REST API
 type Client interface {
 
+	// Returns the configured URL address
+	Address() string
+
 	// Get retrieves all data for a single Object
 	Get(id ID, opts *GetOptions) (map[string]interface{}, Error)
 
@@ -127,6 +130,10 @@ type client struct {
 	address    string
 	token      string
 	httpClient *http.Client
+}
+
+func (c *client) Address() string {
+	return c.address
 }
 
 func (c *client) GetURLWithID(id ID, urlPath string) ([]byte, int, Error) {

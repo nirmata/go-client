@@ -152,7 +152,7 @@ func removeSlash(path string) string {
 func (c *client) get(rawURL string) ([]byte, int, Error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, 0, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+		return nil, 0, NewError("ErrHTTP", "URL parse error", err)
 	}
 
 	req, err := http.NewRequest("GET", u.String(), nil)
@@ -244,19 +244,19 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
-func (c *client) GetRelationID(id ID, name string) (ID, error) {
+func (c *client) GetRelationID(id ID, name string) (ID, Error) {
 	b, err := c.getRelationData(id, name)
 	if err != nil {
 		return nil, err
 	}
 	dataID, parseErr := ParseID(b)
 	if parseErr != nil {
-		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), parseErr)
+		return nil, NewError("ErrHTTP", "ID parse error", parseErr)
 	}
 	return dataID, nil
 }
 
-func (c *client) GetRelation(id ID, name string) (map[string]interface{}, error) {
+func (c *client) GetRelation(id ID, name string) (map[string]interface{}, Error) {
 	b, err := c.getRelationData(id, name)
 	if err != nil {
 		return nil, err
@@ -264,7 +264,7 @@ func (c *client) GetRelation(id ID, name string) (map[string]interface{}, error)
 
 	data, parseErr := ParseCollection(b)
 	if parseErr != nil {
-		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), parseErr)
+		return nil, NewError("ErrHTTP", "Collection parse error", parseErr)
 	}
 
 	if len(data) < 1 {
@@ -355,7 +355,7 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 	return nil, NewError("ErrHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
-func (c *client) Delete(id ID, params map[string]string) error {
+func (c *client) Delete(id ID, params map[string]string) Error {
 	u := NewURLBuilder(c.address).
 		ToService(id.Service()).
 		WithPaths(id.ModelIndex(), id.UUID()).
@@ -458,7 +458,7 @@ func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
 	return c.send(req)
 }
 
-func (c *client) Put(rr *RESTRequest) (map[string]interface{}, error) {
+func (c *client) Put(rr *RESTRequest) (map[string]interface{}, Error) {
 	req, err := c.buildRequest("PUT", rr)
 	if err != nil {
 		return nil, err
@@ -528,7 +528,7 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 
 	resp, err := c.httpClient.Do(request)
 	if err != nil {
-		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+		return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", request.Method, request.URL.String()), err)
 	}
 
 	defer resp.Body.Close()
@@ -541,7 +541,7 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		obj, err := ParseObject(b)
 		if err != nil {
-			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+			return nil, NewError("ErrHTTP", fmt.Sprintf("HTTP %s request %s", request.Method, request.URL.String()), err)
 		}
 		return obj, nil
 	}
@@ -609,13 +609,13 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 
 	obj, newObjectErr := NewObject(objs[0])
 	if newObjectErr != nil {
-		return nil, NewError("ErrInternal", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), newObjectErr)
+		return nil, NewError("ErrInternal", "Failed to create object", newObjectErr)
 	}
 
 	return obj.ID(), nil
 }
 
-func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) error {
+func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error {
 
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()

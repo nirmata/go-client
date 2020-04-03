@@ -607,11 +607,11 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	}
 
 	if len(objs) == 0 {
-		return nil, NewError("ErrInternal", fmt.Sprintf("Failed to find %s with name %s in service %s", modelIndex, name, service.Name()), err.OrigErr())
+		return nil, NewError("ErrInternal", fmt.Sprintf("Failed to find %s with name %s in service %s", modelIndex, name, service.Name()), nil)
 	}
 
 	if len(objs) > 1 {
-		return nil, NewError("ErrInternal", fmt.Sprintf("Multiple %s instances with name %s in service %s", modelIndex, name, service.Name()), err.OrigErr())
+		return nil, NewError("ErrInternal", fmt.Sprintf("Multiple %s instances with name %s in service %s", modelIndex, name, service.Name()), nil)
 	}
 
 	obj, newObjectErr := NewObject(objs[0])

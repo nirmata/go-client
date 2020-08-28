@@ -35,6 +35,10 @@ func ParseID(b []byte) (ID, error) {
 		return nil, err
 	}
 
+	if len(jsonData) == 0 {
+		return nil, fmt.Errorf("not found")
+	}
+
 	return ParseIDFromMap(jsonData[0])
 }
 

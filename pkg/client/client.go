@@ -64,6 +64,11 @@ type Client interface {
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
+
+	// waitForStateChange queries a state and returns old and new state.
+	// It will return old state and error before maxTime is reached
+	waitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error)
+
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
 
@@ -650,6 +655,38 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	}
 }
 
+func (c *client) waitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error) {
+
+	timer := time.NewTimer(maxTime)
+	defer timer.Stop()
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var currentState interface{}
+	for {
+		fmt.Print(msg)
+		select {
+
+		case <-timer.C:
+			return currentState,"",NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, currentState), nil)
+
+		case <-ticker.C:
+			newState, err := c.getState(id, fieldIndex)
+			if err != nil {
+				continue
+			}
+			if currentState != "" {
+				currentState = newState
+			}
+
+			if newState != currentState {
+				return currentState,newState,nil
+			}
+		}
+	}
+}
+
 func (c *client) checkState(id ID, fieldIndex string, value interface{}) (bool, Error) {
 	data, err := c.Get(id, NewGetModelID([]string{fieldIndex}, nil))
 	if err != nil {
@@ -668,4 +705,20 @@ func (c *client) checkState(id ID, fieldIndex string, value interface{}) (bool, 
 	}
 
 	return false, nil
+}
+
+func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
+	data, err := c.Get(id, NewGetModelID([]string{fieldIndex}, nil))
+	if err != nil {
+		return "", err
+	}
+
+	o, newObjectErr := NewObject(data)
+	if newObjectErr != nil {
+		return "", NewError("ErrorInternal", "Something goes wrong", newObjectErr)
+	}
+
+	rval := o.Data()[fieldIndex]
+	glog.V(1).Infof("%s %s = %v\n", id.ModelIndex(), fieldIndex, rval)
+	return rval, nil
 }

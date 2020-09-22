@@ -65,9 +65,9 @@ type Client interface {
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
 
-	// waitForStateChange queries a state and returns old and new state.
+	// WaitForStateChange queries a state and returns old and new state.
 	// It will return old state and error before maxTime is reached
-	waitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error)
+	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error)
 
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
@@ -655,7 +655,7 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	}
 }
 
-func (c *client) waitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error) {
+func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error) {
 
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()

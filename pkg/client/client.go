@@ -64,10 +64,9 @@ type Client interface {
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
-
 	// WaitForStateChange queries a state and returns old and new state.
 	// It will return old state and error before maxTime is reached
-	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error)
+	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, interface{}, Error)
 
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
@@ -104,7 +103,7 @@ func NewGetOptions(fields []string, query Query) *GetOptions {
 	return &GetOptions{fields, query, OutputModeNone}
 }
 
-// NewGetModelID builds a new GetOptions instance with Model ID attribute fields included
+// NewGetModelID builds a new GetOptions instance with Model ID attribute and supplied fields
 func NewGetModelID(fields []string, query Query) *GetOptions {
 	allFields := []string{"id", "modelIndex", "service", "name"}
 	if fields != nil {
@@ -655,7 +654,7 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	}
 }
 
-func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration, msg string) (interface{},interface{},Error) {
+func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, interface{}, Error) {
 
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()
@@ -665,42 +664,36 @@ func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Durat
 
 	var currentState interface{}
 	for {
-		fmt.Print(msg)
 		select {
 
 		case <-timer.C:
-			return currentState,"",NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, currentState), nil)
+			return currentState, "", NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, currentState), nil)
 
 		case <-ticker.C:
 			newState, err := c.getState(id, fieldIndex)
 			if err != nil {
-				continue
+				return nil, nil, err
 			}
-			if currentState != "" {
+
+			if currentState == nil {
 				currentState = newState
+				continue
 			}
 
 			if newState != currentState {
-				return currentState,newState,nil
+				return currentState, newState, nil
 			}
 		}
 	}
 }
 
 func (c *client) checkState(id ID, fieldIndex string, value interface{}) (bool, Error) {
-	data, err := c.Get(id, NewGetModelID([]string{fieldIndex}, nil))
+	currentValue, err := c.getState(id, fieldIndex)
 	if err != nil {
 		return false, err
 	}
 
-	o, newObjectErr := NewObject(data)
-	if newObjectErr != nil {
-		return false, NewError("ErrorInternal", "Something goes wrong", newObjectErr)
-	}
-
-	rval := o.Data()[fieldIndex]
-	glog.V(1).Infof("%s %s = %v\n", id.ModelIndex(), fieldIndex, rval)
-	if rval != nil && rval == value {
+	if currentValue != nil && currentValue == value {
 		return true, nil
 	}
 
@@ -715,10 +708,11 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 
 	o, newObjectErr := NewObject(data)
 	if newObjectErr != nil {
-		return "", NewError("ErrorInternal", "Something goes wrong", newObjectErr)
+		msg := fmt.Sprintf("failed to retrieve state %s from %+v", fieldIndex, id.Map())
+		return "", NewError("ErrorInternal", msg, newObjectErr)
 	}
 
-	rval := o.Data()[fieldIndex]
-	glog.V(1).Infof("%s %s = %v\n", id.ModelIndex(), fieldIndex, rval)
-	return rval, nil
+	stateValue := o.Data()[fieldIndex]
+	glog.V(1).Infof("retrieved %s.%s %v", id.ModelIndex(), fieldIndex, stateValue)
+	return stateValue, nil
 }

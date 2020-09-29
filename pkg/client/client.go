@@ -50,6 +50,9 @@ type Client interface {
 	// GetDescendents retrieves all descendents that match a relation name or a model type
 	GetDescendants(id ID, path string, opts *GetOptions) ([]map[string]interface{}, Error)
 
+	// GetDescendent retrieves as single descendents that matches a relation name or a model type
+	GetDescendant(id ID, path string, opts *GetOptions) (map[string]interface{}, Error)
+
 	// GetAll retrieves a list of objects. The service and modelIndex are required.
 	// Additional options, like which fields to retrieve and a query to filter
 	// results, can be passed using opts.
@@ -64,9 +67,10 @@ type Client interface {
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
-	// WaitForStateChange queries a state and returns old and new state.
-	// It will return old state and error before maxTime is reached
-	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, interface{}, Error)
+	// WaitForStateChange queries a state and returns when it is updated from the current state
+	// If the maxTime is reached the current state is returned and the bool return value (tomeout)
+	// will be set to true. An error is returned only when an API error occurs.
+	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, bool, Error)
 
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
@@ -77,6 +81,9 @@ type Client interface {
 	// Post is used to create resources or call a custom REST endpoint. The contentType is assumed to be YAML.
 	// The path and queryParams are optional
 	PostWithID(id ID, path string, data []byte, queryParams map[string]string) (map[string]interface{}, Error)
+
+	// PutWithIDFromJSON is used to modify a model object with attributes in a JSON map
+	PutWithIDFromJSON(id ID, jsonMap map[string]interface{}) (map[string]interface{}, Error)
 
 	// Put is used to modify a model object.
 	Put(rr *RESTRequest) (map[string]interface{}, Error)
@@ -366,6 +373,23 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 }
 
+func (c *client) GetDescendant(id ID, path string, opts *GetOptions) (map[string]interface{}, Error) {
+	rels, err := c.GetDescendants(id, path, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(rels) == 0 {
+		return nil, NewError("ErrorHTTP", "HTTP 404: not found", nil)
+	}
+
+	if len(rels) > 1 {
+		return nil, NewError("ErrorHTTP", "HTTP 406: multiple matches", nil)
+	}
+
+	return rels[0], nil
+}
+
 func (c *client) Delete(id ID, params map[string]string) Error {
 	u := NewURLBuilder(c.address).
 		ToService(id.Service()).
@@ -478,6 +502,25 @@ func (c *client) Put(rr *RESTRequest) (map[string]interface{}, Error) {
 	return c.send(req)
 }
 
+func (c *client) PutWithIDFromJSON(id ID, jsonMap map[string]interface{}) (map[string]interface{}, Error) {
+	b, err := json.Marshal(jsonMap)
+	if err != nil {
+		return nil, NewError("ErrorInternal", "failed to marshall JSON", err)
+	}
+
+	service := id.Service()
+	requestPath := id.ModelIndex() + "/" + id.UUID()
+	rr := &RESTRequest{
+		Service:     service,
+		Path:        requestPath,
+		ContentType: "application/json",
+		QueryParams: nil,
+		Data:        b,
+	}
+
+	return c.Put(rr)
+}
+
 func (c *client) Options(service Service, url string) (map[string]interface{}, Error) {
 	rr := &RESTRequest{
 		Service: service,
@@ -486,7 +529,7 @@ func (c *client) Options(service Service, url string) (map[string]interface{}, E
 
 	req, err := c.buildRequest("OPTIONS", rr)
 	if err != nil {
-		return nil, NewError("ErrorInternal", "Something goes wrong", err)
+		return nil, NewError("ErrorInternal", "failed to marshall JSON", err)
 	}
 
 	return c.send(req)
@@ -611,7 +654,7 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	}
 
 	if len(objs) == 0 {
-		return nil, NewError("ErrorInternal", fmt.Sprintf("Failed to find %s with name %s in service %s", modelIndex, name, service.Name()), nil)
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP: 404. Failed to find %s with name %s in service %s", modelIndex, name, service.Name()), nil)
 	}
 
 	if len(objs) > 1 {
@@ -654,7 +697,7 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	}
 }
 
-func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, interface{}, Error) {
+func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, bool, Error) {
 
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()
@@ -667,12 +710,12 @@ func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Durat
 		select {
 
 		case <-timer.C:
-			return currentState, "", NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, currentState), nil)
+			return nil, true, nil
 
 		case <-ticker.C:
 			newState, err := c.getState(id, fieldIndex)
 			if err != nil {
-				return nil, nil, err
+				return nil, false, err
 			}
 
 			if currentState == nil {
@@ -681,7 +724,7 @@ func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Durat
 			}
 
 			if newState != currentState {
-				return currentState, newState, nil
+				return newState, false, nil
 			}
 		}
 	}

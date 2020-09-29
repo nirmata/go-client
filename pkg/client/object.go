@@ -8,9 +8,7 @@ type Object interface {
 	Data() map[string]interface{}
 	GetString(name string) string
 	GetRelation(name string) (ID, error)
-
-	// TODO - to be implemented
-	// GetRelations(name string) []ID
+	GetRelations(name string) ([]ID, error)
 }
 
 type object struct {
@@ -53,4 +51,26 @@ func (o *object) GetRelation(name string) (ID, error) {
 
 	idData := val.(map[string]interface{})
 	return ParseIDFromMap(idData)
+}
+
+func (o *object) GetRelations(name string) ([]ID, error) {
+	val := o.data[name]
+	if val == nil {
+		return make([]ID,0), nil
+	}
+
+	idList := val.([]interface{})
+	relations := make([]ID, len(idList))
+
+	for i, v := range idList {
+		idData := v.(map[string]interface{})
+		id, err := ParseIDFromMap(idData)
+		if err != nil {
+			return nil, err
+		}
+
+		relations[i] = id
+	}
+
+	return relations, nil
 }

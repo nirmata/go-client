@@ -67,10 +67,8 @@ type Client interface {
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
-	// WaitForStateChange queries a state and returns when it is updated from the current state
-	// If the maxTime is reached the current state is returned and the bool return value (tomeout)
-	// will be set to true. An error is returned only when an API error occurs.
-	WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, bool, Error)
+	// WaitForStates is similar WaitForState but checks multiple states
+	WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) Error
 
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
@@ -669,23 +667,25 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	return obj.ID(), nil
 }
 
-func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error {
-
+func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) Error {
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()
 
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
-		fmt.Print(msg)
-		select {
 
+		if msg != "" {
+			fmt.Print(msg)
+		}
+
+		select {
 		case <-timer.C:
-			return NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, value), nil)
+			return NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, values), nil)
 
 		case <-ticker.C:
-			match, err := c.checkState(id, fieldIndex, value)
+			match, err := c.checkState(id, fieldIndex, values)
 			if err != nil {
 				return err
 			}
@@ -697,47 +697,24 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	}
 }
 
-func (c *client) WaitForStateChange(id ID, fieldIndex string, maxTime time.Duration) (interface{}, bool, Error) {
-
-	timer := time.NewTimer(maxTime)
-	defer timer.Stop()
-
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	var currentState interface{}
-	for {
-		select {
-
-		case <-timer.C:
-			return nil, true, nil
-
-		case <-ticker.C:
-			newState, err := c.getState(id, fieldIndex)
-			if err != nil {
-				return nil, false, err
-			}
-
-			if currentState == nil {
-				currentState = newState
-				continue
-			}
-
-			if newState != currentState {
-				return newState, false, nil
-			}
-		}
-	}
+func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error {
+	return c.WaitForState(id, fieldIndex, []interface{}{value}, maxTime, msg)
 }
 
-func (c *client) checkState(id ID, fieldIndex string, value interface{}) (bool, Error) {
+func (c *client) checkState(id ID, fieldIndex string, values []interface{}) (bool, Error) {
 	currentValue, err := c.getState(id, fieldIndex)
 	if err != nil {
 		return false, err
 	}
 
-	if currentValue != nil && currentValue == value {
-		return true, nil
+	if currentValue != nil {
+		return false, nil
+	}
+
+	for _, v := range values {
+		if v == currentValue {
+			return true, nil
+		}
 	}
 
 	return false, nil

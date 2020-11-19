@@ -67,8 +67,8 @@ type Client interface {
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
 
-	// WaitForStates is similar WaitForState but checks multiple states
-	WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) Error
+	// WaitForStates is similar WaitForState but checks multiple states and returns the matched state
+	WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) (interface{}, Error)
 
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
@@ -667,7 +667,7 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	return obj.ID(), nil
 }
 
-func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) Error {
+func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) (interface{}, Error) {
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()
 
@@ -682,42 +682,43 @@ func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, m
 
 		select {
 		case <-timer.C:
-			return NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, values), nil)
+			return nil, NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, values), nil)
 
 		case <-ticker.C:
-			match, err := c.checkState(id, fieldIndex, values)
+			match, state, err := c.checkState(id, fieldIndex, values)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			if match {
-				return nil
+				return state, nil
 			}
 		}
 	}
 }
 
 func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error {
-	return c.WaitForState(id, fieldIndex, []interface{}{value}, maxTime, msg)
+	_, err := c.WaitForStates(id, fieldIndex, []interface{}{value}, maxTime, msg)
+	return err
 }
 
-func (c *client) checkState(id ID, fieldIndex string, values []interface{}) (bool, Error) {
+func (c *client) checkState(id ID, fieldIndex string, values []interface{}) (bool, interface{}, Error) {
 	currentValue, err := c.getState(id, fieldIndex)
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	if currentValue != nil {
-		return false, nil
+		return false, nil, nil
 	}
 
 	for _, v := range values {
 		if v == currentValue {
-			return true, nil
+			return true, currentValue, nil
 		}
 	}
 
-	return false, nil
+	return false, nil, nil
 }
 
 func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {

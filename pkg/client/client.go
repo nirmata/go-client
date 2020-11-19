@@ -685,7 +685,7 @@ func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, m
 			return nil, NewError("ErrorInternal", fmt.Sprintf("Timed out on %s = %v", fieldIndex, values), nil)
 
 		case <-ticker.C:
-			match, state, err := c.checkState(id, fieldIndex, values)
+			match, state, err := c.checkStates(id, fieldIndex, values)
 			if err != nil {
 				return nil, err
 			}
@@ -702,14 +702,10 @@ func (c *client) WaitForState(id ID, fieldIndex string, value interface{}, maxTi
 	return err
 }
 
-func (c *client) checkState(id ID, fieldIndex string, values []interface{}) (bool, interface{}, Error) {
+func (c *client) checkStates(id ID, fieldIndex string, values []interface{}) (bool, interface{}, Error) {
 	currentValue, err := c.getState(id, fieldIndex)
 	if err != nil {
 		return false, nil, err
-	}
-
-	if currentValue != nil {
-		return false, nil, nil
 	}
 
 	for _, v := range values {

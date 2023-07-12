@@ -667,6 +667,32 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	return obj.ID(), nil
 }
 
+func (c *client) QueryByID(service Service, modelIndex, id string) (ID, Error) {
+	opts := &GetOptions{}
+	opts.Filter = NewQuery().FieldEqualsValue("id", id)
+	opts.Fields = []string{"id", "name", "modelIndex", "service"}
+
+	objs, err := c.GetCollection(service, modelIndex, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(objs) == 0 {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP: 404. Failed to find %s with id %s in service %s", modelIndex, id, service.Name()), nil)
+	}
+
+	if len(objs) > 1 {
+		return nil, NewError("ErrorInternal", fmt.Sprintf("Multiple %s instances with id %s in service %s", modelIndex, id, service.Name()), nil)
+	}
+
+	obj, newObjectErr := NewObject(objs[0])
+	if newObjectErr != nil {
+		return nil, NewError("ErrorInternal", "Failed to create object", newObjectErr)
+	}
+
+	return obj.ID(), nil
+}
+
 func (c *client) WaitForStates(id ID, fieldIndex string, values []interface{}, maxTime time.Duration, msg string) (interface{}, Error) {
 	timer := time.NewTimer(maxTime)
 	defer timer.Stop()

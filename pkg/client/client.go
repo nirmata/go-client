@@ -63,6 +63,11 @@ type Client interface {
 	// returned.
 	QueryByName(service Service, modelIndex, name string) (ID, Error)
 
+	// QueryById is a convinience method that queries a service collection to find
+	// an object by its 'id' attribute. If a matching object is found, its ID is
+	// returned.
+	QueryById(service Service, modelIndex, id string) (ID, Error)
+
 	// WaitForState queries a state and returns when it matches the specified value
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error
@@ -657,6 +662,32 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 
 	if len(objs) > 1 {
 		return nil, NewError("ErrorInternal", fmt.Sprintf("Multiple %s instances with name %s in service %s", modelIndex, name, service.Name()), nil)
+	}
+
+	obj, newObjectErr := NewObject(objs[0])
+	if newObjectErr != nil {
+		return nil, NewError("ErrorInternal", "Failed to create object", newObjectErr)
+	}
+
+	return obj.ID(), nil
+}
+
+func (c *client) QueryById(service Service, modelIndex, id string) (ID, Error) {
+	opts := &GetOptions{}
+	opts.Filter = NewQuery().FieldEqualsValue("id", id)
+	opts.Fields = []string{"id", "name", "modelIndex", "service"}
+
+	objs, err := c.GetCollection(service, modelIndex, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(objs) == 0 {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP: 404. Failed to find %s with id %s in service %s", modelIndex, id, service.Name()), nil)
+	}
+
+	if len(objs) > 1 {
+		return nil, NewError("ErrorInternal", fmt.Sprintf("Multiple %s instances with id %s in service %s", modelIndex, id, service.Name()), nil)
 	}
 
 	obj, newObjectErr := NewObject(objs[0])

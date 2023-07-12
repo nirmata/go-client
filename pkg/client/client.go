@@ -63,6 +63,8 @@ type Client interface {
 	// returned.
 	QueryByName(service Service, modelIndex, name string) (ID, Error)
 
+	QueryByID(service Service, modelIndex, id string) (ID, Error)
+
 	// WaitForState queries a state and returns when it matches the specified value
 	// or maxTime is reached
 	WaitForState(id ID, fieldIndex string, value interface{}, maxTime time.Duration, msg string) Error

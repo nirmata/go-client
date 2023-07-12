@@ -63,7 +63,10 @@ type Client interface {
 	// returned.
 	QueryByName(service Service, modelIndex, name string) (ID, Error)
 
-	QueryByID(service Service, modelIndex, id string) (ID, Error)
+	// QueryById is a convinience method that queries a service collection to find
+	// an object by its 'id' attribute. If a matching object is found, its ID is
+	// returned.
+	QueryById(service Service, modelIndex, id string) (ID, Error)
 
 	// WaitForState queries a state and returns when it matches the specified value
 	// or maxTime is reached
@@ -669,7 +672,7 @@ func (c *client) QueryByName(service Service, modelIndex, name string) (ID, Erro
 	return obj.ID(), nil
 }
 
-func (c *client) QueryByID(service Service, modelIndex, id string) (ID, Error) {
+func (c *client) QueryById(service Service, modelIndex, id string) (ID, Error) {
 	opts := &GetOptions{}
 	opts.Filter = NewQuery().FieldEqualsValue("id", id)
 	opts.Fields = []string{"id", "name", "modelIndex", "service"}

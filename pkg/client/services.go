@@ -9,23 +9,13 @@ import (
 type Service int
 
 const (
-	// ServiceCatalogs ...
 	ServiceCatalogs Service = iota + 1
-
-	// ServiceEnvironments ...
 	ServiceEnvironments
-
-	// ServiceClusters ...
 	ServiceClusters
-
-	// ServiceUsers ...
 	ServiceUsers
-
-	// ServiceSecurity ...
 	ServiceSecurity
-
-	// ServiceConfig ...
 	ServiceConfig
+	ServicePolicies
 )
 
 // Name returns the service name
@@ -48,6 +38,9 @@ func (s Service) Name() string {
 
 	case ServiceConfig:
 		return "config"
+
+	case ServicePolicies:
+		return "policies"
 
 	default:
 		return ""
@@ -75,7 +68,10 @@ func ParseService(s string) (Service, error) {
 	case "config":
 		return ServiceConfig, nil
 
+	case "policies":
+		return ServicePolicies, nil
+
 	}
 
-	return -1, fmt.Errorf("Invalid service %s", s)
+	return -1, fmt.Errorf("invalid service %s", s)
 }

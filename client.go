@@ -32,6 +32,8 @@ type Client interface {
 	// Returns the configured URL address
 	Address() string
 
+	APIKey() string
+
 	// Get retrieves all data for a single Object
 	Get(id ID, opts *GetOptions) (map[string]interface{}, Error)
 
@@ -810,6 +812,10 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 	stateValue := o.Data()[fieldIndex]
 	glog.V(1).Infof("retrieved %s.%s %v", id.ModelIndex(), fieldIndex, stateValue)
 	return stateValue, nil
+}
+
+func (c *client) APIKey() string {
+	return c.apiToken
 }
 
 func (c *client) SetAuthorizationHeader(req *http.Request) Error {

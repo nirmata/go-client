@@ -99,6 +99,12 @@ type Client interface {
 
 	// Options is used to execute an HTTP OPTIONS request
 	Options(service Service, url string) (map[string]interface{}, Error)
+
+	// SetJWTToken sets the JWT token to be used for subsequent requests
+	SetJWTToken(jwtToken string)
+
+	// FetchJWTToken fetches a new JWT token
+	FetchJWTToken() (string, Error)
 }
 
 // GetOptions contains optional paramameters used when retrieving objects
@@ -135,14 +141,26 @@ func NewClient(address string, token string, httpClient *http.Client, insecure b
 
 	return &client{
 		address:    address,
-		token:      token,
+		apiToken:   token,
 		httpClient: httpClient,
 	}
 }
 
+func NewClientWithJWT(address string, apiToken string, httpClient *http.Client, insecure bool) Client {
+	baseClient := NewClient(address, apiToken, httpClient, insecure)
+	jwtToken, err := baseClient.FetchJWTToken()
+	if err != nil {
+		glog.Errorf("failed to fetch JWT token: %v", err)
+		return nil
+	}
+	baseClient.SetJWTToken(jwtToken)
+	return baseClient
+}
+
 type client struct {
 	address    string
-	token      string
+	apiToken   string
+	jwtToken   string
 	httpClient *http.Client
 }
 
@@ -181,7 +199,10 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP request", "method", req.Method, "URL", req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -238,7 +259,10 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -307,7 +331,10 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -349,7 +376,10 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -419,7 +449,10 @@ func (c *client) delete(u string) Error {
 		return NewError("ErrorInternal", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -460,7 +493,10 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
 	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
@@ -556,7 +592,11 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 	}
 
 	// set default headers before user supplied headers
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
+
 	if rr.ContentType != "" {
 		req.Header.Set("Content-Type", rr.ContentType)
 	}
@@ -767,4 +807,50 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 	stateValue := o.Data()[fieldIndex]
 	glog.V(1).Infof("retrieved %s.%s %v", id.ModelIndex(), fieldIndex, stateValue)
 	return stateValue, nil
+}
+
+func (c *client) SetAuthorizationHeader(req *http.Request) Error {
+	if c.jwtToken == "" {
+		// Authenticate with API token
+		req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.apiToken))
+		return nil
+	}
+
+	if IsJwtTokenExpired(c.jwtToken) {
+		// Refresh JWT token
+		jwtToken, err := c.FetchJWTToken()
+		if err != nil {
+			glog.Errorf("failed to fetch JWT token: %v", err)
+			return err
+		}
+		c.SetJWTToken(jwtToken)
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-JWT %s", c.jwtToken))
+	return nil
+}
+
+func (c *client) FetchJWTToken() (string, Error) {
+	objs, err := c.GetCollection(ServiceUsers, "jwts", &GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	if len(objs) == 0 {
+		return "", NewError("ErrorHTTP", "No JWT token found", nil)
+	}
+
+	if len(objs) > 1 {
+		return "", NewError("ErrorInternal", "Multiple JWT tokens found", nil)
+	}
+
+	if token, exists := objs[0]["token"]; exists {
+		return token.(string), nil
+	}
+
+	return "", NewError("ErrorHTTP", "No JWT token found", nil)
+}
+
+func (c *client) SetJWTToken(jwtToken string) {
+	c.jwtToken = jwtToken
 }

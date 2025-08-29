@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 // RESTRequest is used to pass HTTP Request parameters
@@ -31,6 +31,8 @@ type Client interface {
 
 	// Returns the configured URL address
 	Address() string
+
+	APIKey() string
 
 	// Get retrieves all data for a single Object
 	Get(id ID, opts *GetOptions) (map[string]interface{}, Error)
@@ -99,6 +101,12 @@ type Client interface {
 
 	// Options is used to execute an HTTP OPTIONS request
 	Options(service Service, url string) (map[string]interface{}, Error)
+
+	// SetJWTToken sets the JWT token to be used for subsequent requests
+	SetJWTToken(jwtToken string)
+
+	// FetchJWTToken fetches a new JWT token
+	FetchJWTToken() (string, Error)
 }
 
 // GetOptions contains optional paramameters used when retrieving objects
@@ -124,25 +132,36 @@ func NewGetModelID(fields []string, query Query) *GetOptions {
 }
 
 // NewClient creates a new Client
-func NewClient(address string, token string, httpClient *http.Client, insecure bool) Client {
+func NewClient(address string, token string, insecure bool) Client {
+	httpClient := &http.Client{}
 	if insecure {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	}
-
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
 	}
 
 	return &client{
 		address:    address,
-		token:      token,
+		apiToken:   token,
 		httpClient: httpClient,
 	}
 }
 
+func NewClientWithJWT(address string, apiToken string, insecure bool) Client {
+	baseClient := NewClient(address, apiToken, insecure)
+	jwtToken, err := baseClient.FetchJWTToken()
+	if err != nil {
+		klog.Errorf("failed to fetch JWT token: %v", err)
+		return nil
+	}
+	baseClient.SetJWTToken(jwtToken)
+	return baseClient
+}
+
 type client struct {
 	address    string
-	token      string
+	apiToken   string
+	jwtToken   string
 	httpClient *http.Client
 }
 
@@ -181,9 +200,12 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP request", "method", req.Method, "URL", req.URL.String())
+	klog.Infof("HTTP request method=%s URL=%s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -196,12 +218,12 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		glog.V(1).Infof("HTTP %d '%s': %s", resp.StatusCode, resp.Status, string(b))
+		klog.V(1).Infof("HTTP %d '%s': %s", resp.StatusCode, resp.Status, string(b))
 		return b, resp.StatusCode, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	return b, resp.StatusCode, nil
 }
@@ -238,9 +260,12 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
+	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -252,8 +277,8 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		obj, err := ParseObject(b)
@@ -307,9 +332,12 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
+	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -321,8 +349,8 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return b, nil
@@ -349,9 +377,12 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
+	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -363,8 +394,8 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		parseBody, err := ParseCollection(b)
@@ -419,9 +450,12 @@ func (c *client) delete(u string) Error {
 		return NewError("ErrorInternal", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
+	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -433,8 +467,8 @@ func (c *client) delete(u string) Error {
 		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
@@ -460,9 +494,12 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
 
-	logger.Info("HTTP %s request %s", req.Method, req.URL.String())
+	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -474,8 +511,8 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		body, err := ParseCollection(b)
@@ -556,7 +593,11 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 	}
 
 	// set default headers before user supplied headers
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.token))
+	err = c.SetAuthorizationHeader(req)
+	if err != nil {
+		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
+	}
+
 	if rr.ContentType != "" {
 		req.Header.Set("Content-Type", rr.ContentType)
 	}
@@ -581,8 +622,8 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 }
 
 func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
-	logger.Info("HTTP request", "method", request.Method, "URL", request.URL.String())
-	logger.Debug("HTTP request", "request", dumpRequest(request))
+	klog.Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
+	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
 
 	resp, err := c.httpClient.Do(request)
 	if err != nil {
@@ -596,8 +637,8 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", request.Method, request.URL.String()), err)
 	}
 
-	logger.Info("HTTP response", "status", resp.Status, "length", len(b))
-	logger.Debug("HTTP response", "body", string(b))
+	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		obj, err := ParseObject(b)
@@ -765,6 +806,56 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 	}
 
 	stateValue := o.Data()[fieldIndex]
-	glog.V(1).Infof("retrieved %s.%s %v", id.ModelIndex(), fieldIndex, stateValue)
+	klog.V(1).Infof("retrieved %s.%s %v", id.ModelIndex(), fieldIndex, stateValue)
 	return stateValue, nil
+}
+
+func (c *client) APIKey() string {
+	return c.apiToken
+}
+
+func (c *client) SetAuthorizationHeader(req *http.Request) Error {
+	if c.jwtToken == "" {
+		// Authenticate with API token
+		req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.apiToken))
+		return nil
+	}
+
+	if IsJwtTokenExpired(c.jwtToken) {
+		// Refresh JWT token
+		jwtToken, err := c.FetchJWTToken()
+		if err != nil {
+			klog.Errorf("failed to fetch JWT token: %v", err)
+			return err
+		}
+		c.SetJWTToken(jwtToken)
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-JWT %s", c.jwtToken))
+	return nil
+}
+
+func (c *client) FetchJWTToken() (string, Error) {
+	objs, err := c.GetCollection(ServiceUsers, "jwts", &GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	if len(objs) == 0 {
+		return "", NewError("ErrorHTTP", "No JWT token found", nil)
+	}
+
+	if len(objs) > 1 {
+		return "", NewError("ErrorInternal", "Multiple JWT tokens found", nil)
+	}
+
+	if token, exists := objs[0]["token"]; exists {
+		return token.(string), nil
+	}
+
+	return "", NewError("ErrorHTTP", "No JWT token found", nil)
+}
+
+func (c *client) SetJWTToken(jwtToken string) {
+	c.jwtToken = jwtToken
 }

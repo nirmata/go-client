@@ -205,7 +205,7 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP request method=%s URL=%s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP request method=%s URL=%s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -222,7 +222,7 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 		return b, resp.StatusCode, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	return b, resp.StatusCode, nil
@@ -265,7 +265,7 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -277,7 +277,7 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -337,7 +337,7 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -349,7 +349,7 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -382,7 +382,7 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -394,7 +394,7 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -455,7 +455,7 @@ func (c *client) delete(u string) Error {
 		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -467,7 +467,7 @@ func (c *client) delete(u string) Error {
 		return NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -499,7 +499,7 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP %s request %s", req.Method, req.URL.String())
+	klog.V(3).Infof("HTTP %s request %s", req.Method, req.URL.String())
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
@@ -511,7 +511,7 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -622,7 +622,7 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 }
 
 func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
-	klog.Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
+	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
 	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
 
 	resp, err := c.httpClient.Do(request)
@@ -637,7 +637,7 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 		return nil, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", request.Method, request.URL.String()), err)
 	}
 
-	klog.Infof("HTTP response status=%s length=%d", resp.Status, len(b))
+	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(3).Infof("HTTP response body=%s", string(b))
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {

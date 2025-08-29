@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 func IsJwtTokenExpired(jwtToken string) bool {
 	payload, err := getJWTPayload(jwtToken)
 	if err != nil {
-		glog.Errorf("Failed to get JWT payload: %s", err)
+		klog.Errorf("Failed to get JWT payload: %s", err)
 		return true
 	}
 
 	expTime, err := getExpiryTimeFromJWT(payload)
 	if err != nil {
-		glog.Errorf("Failed to get expiry time from JWT: %s", err)
+		klog.Errorf("Failed to get expiry time from JWT: %s", err)
 		return true
 	}
 
@@ -30,7 +30,7 @@ func getJWTPayload(jwtToken string) ([]byte, error) {
 	// JWT will have 3 parts: header, payload, signature
 	parts := strings.Split(jwtToken, ".")
 	if len(parts) != 3 {
-		glog.Errorf("Invalid JWT token: %s", jwtToken)
+		klog.Errorf("Invalid JWT token: %s", jwtToken)
 		return nil, fmt.Errorf("invalid JWT token")
 	}
 

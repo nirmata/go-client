@@ -16,7 +16,7 @@ type User struct {
 	Role  string
 }
 
-func NewUsersClient(address, apiKey string, insecure bool) *UsersClient {
+func New(address, apiKey string, insecure bool) *UsersClient {
 	client := client.NewClient(address, apiKey, insecure)
 	return &UsersClient{Client: client}
 }

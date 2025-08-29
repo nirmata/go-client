@@ -130,9 +130,12 @@ func NewGetModelID(fields []string, query Query) *GetOptions {
 }
 
 // NewClient creates a new Client
-func NewClient(address string, token string, httpClient *http.Client, insecure bool) Client {
+func NewClient(address string, token string, insecure bool) Client {
+	httpClient := &http.Client{}
 	if insecure {
-		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
+		}
 	}
 
 	if httpClient == nil {
@@ -146,8 +149,8 @@ func NewClient(address string, token string, httpClient *http.Client, insecure b
 	}
 }
 
-func NewClientWithJWT(address string, apiToken string, httpClient *http.Client, insecure bool) Client {
-	baseClient := NewClient(address, apiToken, httpClient, insecure)
+func NewClientWithJWT(address string, apiToken string, insecure bool) Client {
+	baseClient := NewClient(address, apiToken, insecure)
 	jwtToken, err := baseClient.FetchJWTToken()
 	if err != nil {
 		glog.Errorf("failed to fetch JWT token: %v", err)

@@ -11,9 +11,11 @@ type UsersClient struct {
 }
 
 type User struct {
-	Name  string
-	Email string
-	Role  string
+	Name     string
+	Email    string
+	Role     string
+	ID       string
+	TenantID string
 }
 
 func New(address, apiKey string, insecure bool) *UsersClient {
@@ -21,11 +23,10 @@ func New(address, apiKey string, insecure bool) *UsersClient {
 	return &UsersClient{Client: client}
 }
 
-func (c *UsersClient) GetCurrentUser(email string) (User, error) {
-	fields := []string{"name", "email", "role", "apiKey"}
+func (c *UsersClient) GetCurrentUser() (User, error) {
+	fields := []string{"name", "email", "role", "id", "tenantId"}
 
-	// TODO: filter by apiKey instead of email
-	query := client.NewQuery().FieldEqualsValue("email", email)
+	query := client.NewQuery().FieldEqualsValue("apiKey", c.Client.APIKey())
 	users, err := c.Client.GetCollection(client.ServiceUsers, "users", client.NewGetOptions(fields, query))
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get current user: %w", err)
@@ -35,15 +36,15 @@ func (c *UsersClient) GetCurrentUser(email string) (User, error) {
 		return User{}, fmt.Errorf("no users found for the current API key")
 	}
 
-	for _, user := range users {
-		if user["apiKey"] == c.Client.APIKey() {
-			return User{
-				Name:  user["name"].(string),
-				Email: user["email"].(string),
-				Role:  user["role"].(string),
-			}, nil
-		}
+	if len(users) > 1 {
+		return User{}, fmt.Errorf("multiple users found for the current API key")
 	}
-
-	return User{}, fmt.Errorf("no user found for the current API key")
+	user := users[0]
+	return User{
+		Name:     user["name"].(string),
+		Email:    user["email"].(string),
+		Role:     user["role"].(string),
+		ID:       user["id"].(string),
+		TenantID: user["tenantId"].(string),
+	}, nil
 }

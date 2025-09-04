@@ -2,6 +2,7 @@ package serviceclients
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/nirmata/go-client"
 )
@@ -24,9 +25,11 @@ func New(address, apiKey string, insecure bool) *UsersClient {
 }
 
 func (c *UsersClient) GetCurrentUser() (User, error) {
-	fields := []string{"name", "email", "role", "id", "tenantId"}
+	fields := []string{"name", "email", "role", "id", "parent"}
 
-	query := client.NewQuery().FieldEqualsValue("apiKey", c.Client.APIKey())
+	urlEncodedAPIKey := url.QueryEscape(c.Client.APIKey())
+
+	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
 	users, err := c.Client.GetCollection(client.ServiceUsers, "users", client.NewGetOptions(fields, query))
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get current user: %w", err)
@@ -40,11 +43,33 @@ func (c *UsersClient) GetCurrentUser() (User, error) {
 		return User{}, fmt.Errorf("multiple users found for the current API key")
 	}
 	user := users[0]
+
+	var name, email, role, id, tenantID string
+	if IName, exists := user["name"]; exists {
+		name = IName.(string)
+	}
+	if IEmail, exists := user["email"]; exists {
+		email = IEmail.(string)
+	}
+	if IRole, exists := user["role"]; exists {
+		role = IRole.(string)
+	}
+	if IID, exists := user["id"]; exists {
+		id = IID.(string)
+	}
+
+	if IParent, exists := user["parent"]; exists {
+		parent := IParent.(map[string]interface{})
+		if ITenantID, exists := parent["id"]; exists {
+			tenantID = ITenantID.(string)
+		}
+	}
+
 	return User{
-		Name:     user["name"].(string),
-		Email:    user["email"].(string),
-		Role:     user["role"].(string),
-		ID:       user["id"].(string),
-		TenantID: user["tenantId"].(string),
+		Name:     name,
+		Email:    email,
+		Role:     role,
+		ID:       id,
+		TenantID: tenantID,
 	}, nil
 }

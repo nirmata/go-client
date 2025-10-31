@@ -831,7 +831,7 @@ func (c *client) SetAuthorizationHeader(req *http.Request) Error {
 		c.SetJWTToken(jwtToken)
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-JWT %s", c.jwtToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.jwtToken))
 	return nil
 }
 

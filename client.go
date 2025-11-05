@@ -171,7 +171,7 @@ func (c *client) Address() string {
 
 func (c *client) GetURLWithID(id ID, urlPath string) ([]byte, int, Error) {
 
-	rawURL := removeSlash(c.address) + "/" +
+	rawURL := getBaseURL(c.address, id.Service().Name()) + "/" +
 		id.Service().Name() + "/api/" +
 		id.ModelIndex() + "/" +
 		id.UUID() + "/" +
@@ -181,12 +181,17 @@ func (c *client) GetURLWithID(id ID, urlPath string) ([]byte, int, Error) {
 }
 
 func (c *client) GetURL(service Service, urlPath string) ([]byte, int, Error) {
-	p := strings.Join([]string{removeSlash(c.address), service.Name(), "api", escapeQuery(urlPath)}, "/")
+	p := strings.Join([]string{getBaseURL(c.address, service.Name()), service.Name(), "api", escapeQuery(urlPath)}, "/")
 	return c.get(p)
 }
 
-func removeSlash(path string) string {
-	return strings.TrimRight(path, "/")
+func getBaseURL(address string, serviceName string) string {
+	if IsInternalBaseURL(address) {
+		// Inject the service name as the base URL
+		return address + serviceName
+	}
+
+	return strings.TrimRight(address, "/")
 }
 
 func (c *client) get(rawURL string) ([]byte, int, Error) {

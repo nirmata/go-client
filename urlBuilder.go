@@ -38,7 +38,14 @@ func NewURLBuilder(address string) URLBuilder {
 	return ub
 }
 
+func IsInternalBaseURL(address string) bool {
+	return address == "https://" || address == "http://"
+}
+
 func (ub *urlBldr) ToService(s Service) URLBuilder {
+	if IsInternalBaseURL(ub.address) {
+		ub.paths = append(ub.paths, s.Name())
+	}
 	ub.paths = append(ub.paths, s.Name())
 	ub.paths = append(ub.paths, "api")
 	return ub

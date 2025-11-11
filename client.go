@@ -32,8 +32,6 @@ type Client interface {
 	// Returns the configured URL address
 	Address() string
 
-	APIKey() string
-
 	// Get retrieves all data for a single Object
 	Get(id ID, opts *GetOptions) (map[string]interface{}, Error)
 
@@ -102,8 +100,8 @@ type Client interface {
 	// Options is used to execute an HTTP OPTIONS request
 	Options(service Service, url string) (map[string]interface{}, Error)
 
-	// SetJWTToken sets the JWT token to be used for subsequent requests
-	SetJWTToken(jwtToken string)
+	// SetAuth sets the authentication provider to be used for subsequent requests
+	SetAuth(auth AuthProvider)
 
 	// FetchJWTToken fetches a new JWT token
 	FetchJWTToken() (string, Error)
@@ -131,8 +129,8 @@ func NewGetModelID(fields []string, query Query) *GetOptions {
 	return &GetOptions{allFields, query, OutputModeNone}
 }
 
-// NewClient creates a new Client
-func NewClient(address string, token string, insecure bool) Client {
+// NewClientWithAuth creates a new Client with the specified authentication provider
+func NewClient(address string, auth AuthProvider, insecure bool) Client {
 	httpClient := &http.Client{}
 	if insecure {
 		httpClient.Transport = &http.Transport{
@@ -141,28 +139,28 @@ func NewClient(address string, token string, insecure bool) Client {
 	}
 
 	return &client{
-		address:    address,
-		apiToken:   token,
-		httpClient: httpClient,
+		address:      address,
+		authProvider: auth,
+		httpClient:   httpClient,
 	}
 }
 
-func NewClientWithJWT(address string, apiToken string, insecure bool) Client {
-	baseClient := NewClient(address, apiToken, insecure)
-	jwtToken, err := baseClient.FetchJWTToken()
-	if err != nil {
-		klog.Errorf("failed to fetch JWT token: %v", err)
-		return nil
-	}
-	baseClient.SetJWTToken(jwtToken)
-	return baseClient
+func NewClientWithAPIKey(address string, apiKey string, insecure bool) Client {
+	return NewClient(address, NewAPITokenAuth(apiKey), insecure)
+}
+
+func NewClientWithJWTToken(address string, jwtToken string, insecure bool) Client {
+	return NewClient(address, NewJWTTokenAuth(jwtToken), insecure)
+}
+
+func NewClientWithServiceAccountToken(address string, serviceAccountToken string, insecure bool) Client {
+	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken), insecure)
 }
 
 type client struct {
-	address    string
-	apiToken   string
-	jwtToken   string
-	httpClient *http.Client
+	address      string
+	authProvider AuthProvider
+	httpClient   *http.Client
 }
 
 func (c *client) Address() string {
@@ -815,29 +813,15 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 	return stateValue, nil
 }
 
-func (c *client) APIKey() string {
-	return c.apiToken
+func (c *client) SetAuth(auth AuthProvider) {
+	c.authProvider = auth
 }
 
 func (c *client) SetAuthorizationHeader(req *http.Request) Error {
-	if c.jwtToken == "" {
-		// Authenticate with API token
-		req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.apiToken))
-		return nil
+	if c.authProvider == nil {
+		return NewError("ErrorInternal", "No auth provider configured", nil)
 	}
-
-	if IsJwtTokenExpired(c.jwtToken) {
-		// Refresh JWT token
-		jwtToken, err := c.FetchJWTToken()
-		if err != nil {
-			klog.Errorf("failed to fetch JWT token: %v", err)
-			return err
-		}
-		c.SetJWTToken(jwtToken)
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.jwtToken))
-	return nil
+	return c.authProvider.SetAuthHeader(req)
 }
 
 func (c *client) FetchJWTToken() (string, Error) {
@@ -859,8 +843,4 @@ func (c *client) FetchJWTToken() (string, Error) {
 	}
 
 	return "", NewError("ErrorHTTP", "No JWT token found", nil)
-}
-
-func (c *client) SetJWTToken(jwtToken string) {
-	c.jwtToken = jwtToken
 }

@@ -537,6 +537,15 @@ func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
 	return c.send(req)
 }
 
+func (c *client) PostRaw(rr *RESTRequest) (*http.Response, error) {
+	req, err := c.buildRequest("POST", rr)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.sendRaw(req)
+}
+
 func (c *client) Put(rr *RESTRequest) (map[string]interface{}, Error) {
 	req, err := c.buildRequest("PUT", rr)
 	if err != nil {
@@ -624,6 +633,18 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 	return req, nil
 }
 
+// sendRaw sends an HTTP request and returns the raw response without processing
+// The caller is responsible for closing the response body
+func (c *client) sendRaw(request *http.Request) (*http.Response, error) {
+	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
+	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
+
+	resp, err := c.httpClient.Do(request)
+	defer resp.Body.Close()
+	klog.V(3).Infof("HTTP response status=%s", resp.Status)
+	return resp, err
+}
+
 func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
 	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
@@ -674,6 +695,23 @@ func (c *client) PostFromJSON(service Service, path string, jsonMap map[string]i
 	}
 
 	return c.Post(req)
+}
+
+func (c *client) PostRawFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error) {
+	b, err := json.Marshal(jsonMap)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &RESTRequest{
+		Service:     service,
+		Path:        path,
+		ContentType: "application/json",
+		QueryParams: queryParams,
+		Data:        b,
+	}
+
+	return c.PostRaw(req)
 }
 
 func (c *client) PostWithID(id ID, path string, data []byte, queryParams map[string]string) (map[string]interface{}, Error) {

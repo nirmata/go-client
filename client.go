@@ -81,6 +81,10 @@ type Client interface {
 	// Post is used to create a new model object. The contentType is assumed to be JSON. The queryParams is optional.
 	PostFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (map[string]interface{}, Error)
 
+	// PostRawFromJSON is used send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// The response is returned as a raw HTTP response.
+	PostRawFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error)
+
 	// Post is used to create resources or call a custom REST endpoint. The contentType is assumed to be YAML.
 	// The path and queryParams are optional
 	PostWithID(id ID, path string, data []byte, queryParams map[string]string) (map[string]interface{}, Error)

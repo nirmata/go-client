@@ -78,16 +78,16 @@ type Client interface {
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
 
-	// PostRaw is used to send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// PostAndGetRawResponse is used to send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
 	// The response is returned as a raw HTTP response.
-	PostRaw(rr *RESTRequest) (*http.Response, error)
+	PostAndGetRawResponse(rr *RESTRequest) (*http.Response, error)
 
 	// Post is used to create a new model object. The contentType is assumed to be JSON. The queryParams is optional.
 	PostFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (map[string]interface{}, Error)
 
-	// PostRawFromJSON is used send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// PostAndGetRawResponseFromJSON is used send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
 	// The response is returned as a raw HTTP response.
-	PostRawFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error)
+	PostAndGetRawResponseFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error)
 
 	// Post is used to create resources or call a custom REST endpoint. The contentType is assumed to be YAML.
 	// The path and queryParams are optional
@@ -545,13 +545,13 @@ func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
 	return c.send(req)
 }
 
-func (c *client) PostRaw(rr *RESTRequest) (*http.Response, error) {
+func (c *client) PostAndGetRawResponse(rr *RESTRequest) (*http.Response, error) {
 	req, err := c.buildRequest("POST", rr)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.sendRaw(req)
+	return c.sendAndGetRawResponse(req)
 }
 
 func (c *client) Put(rr *RESTRequest) (map[string]interface{}, Error) {
@@ -642,15 +642,18 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 }
 
 // sendRaw sends an HTTP request and returns the raw response without processing
-// The caller is responsible for closing the response body
-func (c *client) sendRaw(request *http.Request) (*http.Response, error) {
+func (c *client) sendAndGetRawResponse(request *http.Request) (*http.Response, error) {
 	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
 	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
 
 	resp, err := c.httpClient.Do(request)
+	if err != nil {
+		return resp, err
+	}
+
 	defer resp.Body.Close()
 	klog.V(3).Infof("HTTP response status=%s", resp.Status)
-	return resp, err
+	return resp, nil
 }
 
 func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
@@ -705,7 +708,7 @@ func (c *client) PostFromJSON(service Service, path string, jsonMap map[string]i
 	return c.Post(req)
 }
 
-func (c *client) PostRawFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error) {
+func (c *client) PostAndGetRawResponseFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error) {
 	b, err := json.Marshal(jsonMap)
 	if err != nil {
 		return nil, err
@@ -719,7 +722,7 @@ func (c *client) PostRawFromJSON(service Service, path string, jsonMap map[strin
 		Data:        b,
 	}
 
-	return c.PostRaw(req)
+	return c.PostAndGetRawResponse(req)
 }
 
 func (c *client) PostWithID(id ID, path string, data []byte, queryParams map[string]string) (map[string]interface{}, Error) {

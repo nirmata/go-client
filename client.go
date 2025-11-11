@@ -78,6 +78,10 @@ type Client interface {
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
 
+	// PostRaw is used to send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// The response is returned as a raw HTTP response.
+	PostRaw(rr *RESTRequest) (*http.Response, error)
+
 	// Post is used to create a new model object. The contentType is assumed to be JSON. The queryParams is optional.
 	PostFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (map[string]interface{}, Error)
 

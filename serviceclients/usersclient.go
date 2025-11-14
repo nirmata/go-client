@@ -19,15 +19,14 @@ type User struct {
 	TenantID string
 }
 
-func New(address, apiKey string, insecure bool) *UsersClient {
-	client := client.NewClient(address, apiKey, insecure)
-	return &UsersClient{Client: client}
+func New(address string, auth client.AuthProvider, insecure bool) *UsersClient {
+	return &UsersClient{Client: client.NewClient(address, auth, insecure)}
 }
 
-func (c *UsersClient) GetCurrentUser() (User, error) {
+func (c *UsersClient) GetCurrentUserWithAPIKey(apiKey string) (User, error) {
 	fields := []string{"name", "email", "role", "id", "parent"}
 
-	urlEncodedAPIKey := url.QueryEscape(c.Client.APIKey())
+	urlEncodedAPIKey := url.QueryEscape(apiKey)
 
 	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
 	users, err := c.Client.GetCollection(client.ServiceUsers, "users", client.NewGetOptions(fields, query))

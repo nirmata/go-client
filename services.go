@@ -16,6 +16,7 @@ const (
 	ServiceSecurity
 	ServiceConfig
 	ServicePolicies
+	ServiceLLMApps
 )
 
 // Name returns the service name
@@ -41,6 +42,9 @@ func (s Service) Name() string {
 
 	case ServicePolicies:
 		return "policies"
+
+	case ServiceLLMApps:
+		return "llm-apps"
 
 	default:
 		return ""
@@ -70,6 +74,9 @@ func ParseService(s string) (Service, error) {
 
 	case "policies":
 		return ServicePolicies, nil
+
+	case "llm-apps":
+		return ServiceLLMApps, nil
 
 	}
 

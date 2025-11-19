@@ -1,6 +1,7 @@
 package serviceclients
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 
@@ -43,6 +44,79 @@ func (c *UsersClient) GetCurrentUser() (User, error) {
 		return User{}, fmt.Errorf("multiple users found for the current API key")
 	}
 	user := users[0]
+
+	var name, email, role, id, tenantID string
+	if IName, exists := user["name"]; exists {
+		name = IName.(string)
+	}
+	if IEmail, exists := user["email"]; exists {
+		email = IEmail.(string)
+	}
+	if IRole, exists := user["role"]; exists {
+		role = IRole.(string)
+	}
+	if IID, exists := user["id"]; exists {
+		id = IID.(string)
+	}
+
+	if IParent, exists := user["parent"]; exists {
+		parent := IParent.(map[string]interface{})
+		if ITenantID, exists := parent["id"]; exists {
+			tenantID = ITenantID.(string)
+		}
+	}
+
+	return User{
+		Name:     name,
+		Email:    email,
+		Role:     role,
+		ID:       id,
+		TenantID: tenantID,
+	}, nil
+}
+
+// GetUserByAPIKey retrieves a user by their API key using service-to-service authentication
+// This is used when a service (like llm-apps) needs to verify a user's API key
+// The service authenticates with its ServiceAccount token, not the user's API key
+func GetUserByAPIKey(apiKey string, address string, insecure bool) (User, error) {
+	// Create ServiceClient for service-to-service authentication
+	serviceClient, err := client.NewServiceClient(client.ServiceClientConfig{
+		Service:  client.ServiceUsers,
+		Address:  address,
+		Insecure: insecure,
+	})
+	if err != nil {
+		return User{}, fmt.Errorf("failed to create service client: %w", err)
+	}
+
+	// Query users by API key
+	fields := "name,email,role,id,parent"
+	urlEncodedAPIKey := url.QueryEscape(apiKey)
+	path := fmt.Sprintf("users?fields=%s&apiKey=%s", fields, urlEncodedAPIKey)
+
+	// Make authenticated service-to-service call
+	responseBody, statusCode, clientErr := serviceClient.Get(path)
+	if clientErr != nil {
+		return User{}, fmt.Errorf("failed to get user by API key: %s (status: %d)", clientErr.Message(), statusCode)
+	}
+
+	// Parse response
+	var response struct {
+		ModelList []map[string]interface{} `json:"modelList"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return User{}, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if len(response.ModelList) == 0 {
+		return User{}, fmt.Errorf("no users found for the provided API key")
+	}
+
+	if len(response.ModelList) > 1 {
+		return User{}, fmt.Errorf("multiple users found for the provided API key")
+	}
+
+	user := response.ModelList[0]
 
 	var name, email, role, id, tenantID string
 	if IName, exists := user["name"]; exists {

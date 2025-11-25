@@ -42,7 +42,10 @@ type ServiceClientConfig struct {
 	// If empty, uses DefaultServiceAccountTokenPath
 	ServiceAccountTokenPath string
 
-	// Insecure allows skipping TLS certificate verification (for development only)
+	// Insecure skips TLS certificate verification.
+	// For internal service-to-service communication, this matches Java's behavior
+	// where DnsServiceClient uses a "trust all" TrustManager.
+	// Traffic is still encrypted via TLS, only certificate verification is skipped.
 	Insecure bool
 }
 
@@ -75,6 +78,9 @@ func NewServiceClient(config ServiceClientConfig) (*ServiceClient, error) {
 	saToken := strings.TrimSpace(string(tokenBytes))
 
 	// Create HTTP client
+	// For internal service-to-service communication, we skip TLS verification
+	// to match Java's DnsServiceClient behavior (which uses a "trust all" TrustManager).
+	// Traffic is still encrypted via TLS.
 	httpClient := &http.Client{}
 	if config.Insecure {
 		httpClient.Transport = &http.Transport{
@@ -82,8 +88,8 @@ func NewServiceClient(config ServiceClientConfig) (*ServiceClient, error) {
 		}
 	}
 
-	klog.V(2).Infof("Created ServiceClient: target=%s, address=%s",
-		config.Service.Name(), address)
+	klog.V(2).Infof("Created ServiceClient: target=%s, address=%s, insecure=%v",
+		config.Service.Name(), address, config.Insecure)
 
 	return &ServiceClient{
 		service:    config.Service,

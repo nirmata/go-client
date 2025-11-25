@@ -89,10 +89,12 @@ func GetUserByAPIKey(apiKey string, address string, insecure bool) (User, error)
 		return User{}, fmt.Errorf("failed to create service client: %w", err)
 	}
 
-	// Query users by API key
+	// Query users by API key using the query filter format
+	// The API expects a JSON query like: {"apiKey": "value"}
 	fields := "name,email,role,id,parent"
 	urlEncodedAPIKey := url.QueryEscape(apiKey)
-	path := fmt.Sprintf("users?fields=%s&apiKey=%s", fields, urlEncodedAPIKey)
+	query := url.QueryEscape(fmt.Sprintf(`{"apiKey":"%s"}`, urlEncodedAPIKey))
+	path := fmt.Sprintf("users?fields=%s&query=%s", fields, query)
 
 	// Make authenticated service-to-service call
 	responseBody, statusCode, clientErr := serviceClient.Get(path)

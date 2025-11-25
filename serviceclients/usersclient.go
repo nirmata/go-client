@@ -100,23 +100,21 @@ func GetUserByAPIKey(apiKey string, address string, insecure bool) (User, error)
 		return User{}, fmt.Errorf("failed to get user by API key: %s (status: %d)", clientErr.Message(), statusCode)
 	}
 
-	// Parse response
-	var response struct {
-		ModelList []map[string]interface{} `json:"modelList"`
-	}
-	if err := json.Unmarshal(responseBody, &response); err != nil {
+	// Parse response - API returns a direct array, not wrapped in modelList
+	var users []map[string]interface{}
+	if err := json.Unmarshal(responseBody, &users); err != nil {
 		return User{}, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if len(response.ModelList) == 0 {
+	if len(users) == 0 {
 		return User{}, fmt.Errorf("no users found for the provided API key")
 	}
 
-	if len(response.ModelList) > 1 {
+	if len(users) > 1 {
 		return User{}, fmt.Errorf("multiple users found for the provided API key")
 	}
 
-	user := response.ModelList[0]
+	user := users[0]
 
 	var name, email, role, id, tenantID string
 	if IName, exists := user["name"]; exists {

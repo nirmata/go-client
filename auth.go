@@ -40,8 +40,12 @@ type ServiceAccountTokenAuth struct {
 	Address             string
 	serviceAccountToken string
 	clientid            string
-	jwtToken            string
-	mu                  sync.Mutex
+
+	/*The JWT token is fetched using the
+	service account token and is short lived
+	*/
+	jwtToken string
+	mu       sync.Mutex
 }
 
 func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clientid string) AuthProvider {

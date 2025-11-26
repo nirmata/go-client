@@ -76,40 +76,30 @@ func (c *UsersClient) GetCurrentUser() (User, error) {
 	}, nil
 }
 
-// GetUserByAPIKey retrieves a user by their API key using service-to-service authentication
-// This is used when a service (like llm-apps) needs to verify a user's API key
-// The service authenticates with its ServiceAccount token, not the user's API key
-func GetUserByAPIKey(apiKey string, address string, insecure bool) (User, error) {
-	// Create ServiceClient for service-to-service authentication
+// GetUserByAPIKey retrieves a user by API key using service-to-service authentication
+func GetUserByAPIKey(apiKey string, address string) (User, error) {
 	serviceClient, err := client.NewServiceClient(client.ServiceClientConfig{
-		Service:  client.ServiceUsers,
-		Address:  address,
-		Insecure: insecure,
+		Service: client.ServiceUsers,
+		Address: address,
 	})
 	if err != nil {
 		return User{}, fmt.Errorf("failed to create service client: %w", err)
 	}
 
-	// Query users by API key using the same format as GetCurrentUser()
-	// Use Query object to ensure consistent formatting with existing code
 	fields := []string{"name", "email", "role", "id", "parent"}
 	urlEncodedAPIKey := url.QueryEscape(apiKey)
 	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
 
-	// Build the path manually to match GetCollection format
-	// Format: users?fields=name,email,role,id,parent&query={"apiKey" : "value"}
 	fieldsStr := strings.Join(fields, ", ")
 	fieldsEncoded := url.QueryEscape(fieldsStr)
 	queryStr := url.QueryEscape(query.String())
 	path := fmt.Sprintf("users?fields=%s&query=%s", fieldsEncoded, queryStr)
 
-	// Make authenticated service-to-service call
 	responseBody, statusCode, clientErr := serviceClient.Get(path)
 	if clientErr != nil {
 		return User{}, fmt.Errorf("failed to get user by API key: %s (status: %d)", clientErr.Message(), statusCode)
 	}
 
-	// Parse response - API returns a direct array, not wrapped in modelList
 	var users []map[string]interface{}
 	if err := json.Unmarshal(responseBody, &users); err != nil {
 		return User{}, fmt.Errorf("failed to parse response: %w", err)

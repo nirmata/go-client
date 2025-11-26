@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/nirmata/go-client"
 )
@@ -89,12 +90,18 @@ func GetUserByAPIKey(apiKey string, address string, insecure bool) (User, error)
 		return User{}, fmt.Errorf("failed to create service client: %w", err)
 	}
 
-	// Query users by API key using the query filter format
-	// The API expects a JSON query like: {"apiKey": "value"}
-	fields := "name,email,role,id,parent"
+	// Query users by API key using the same format as GetCurrentUser()
+	// Use Query object to ensure consistent formatting with existing code
+	fields := []string{"name", "email", "role", "id", "parent"}
 	urlEncodedAPIKey := url.QueryEscape(apiKey)
-	query := url.QueryEscape(fmt.Sprintf(`{"apiKey":"%s"}`, urlEncodedAPIKey))
-	path := fmt.Sprintf("users?fields=%s&query=%s", fields, query)
+	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
+
+	// Build the path manually to match GetCollection format
+	// Format: users?fields=name,email,role,id,parent&query={"apiKey" : "value"}
+	fieldsStr := strings.Join(fields, ", ")
+	fieldsEncoded := url.QueryEscape(fieldsStr)
+	queryStr := url.QueryEscape(query.String())
+	path := fmt.Sprintf("users?fields=%s&query=%s", fieldsEncoded, queryStr)
 
 	// Make authenticated service-to-service call
 	responseBody, statusCode, clientErr := serviceClient.Get(path)

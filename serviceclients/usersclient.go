@@ -19,7 +19,7 @@ type User struct {
 	TenantID string
 }
 
-func New(address string, auth client.AuthProvider, insecure bool) *UsersClient {
+func NewUsersClient(address string, auth client.AuthProvider, insecure bool) *UsersClient {
 	return &UsersClient{Client: client.NewClient(address, auth, insecure)}
 }
 

@@ -102,9 +102,6 @@ type Client interface {
 
 	// SetAuth sets the authentication provider to be used for subsequent requests
 	SetAuth(auth AuthProvider)
-
-	// FetchJWTToken fetches a new JWT token
-	FetchJWTToken() (string, Error)
 }
 
 // GetOptions contains optional paramameters used when retrieving objects
@@ -153,8 +150,8 @@ func NewClientWithJWTToken(address string, jwtToken string, insecure bool) Clien
 	return NewClient(address, NewJWTTokenAuth(jwtToken), insecure)
 }
 
-func NewClientWithServiceAccountToken(address string, serviceAccountToken string, insecure bool) Client {
-	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken), insecure)
+func NewClientWithServiceAccountToken(address string, serviceAccountToken string, clientid string, insecure bool) Client {
+	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken, address, clientid), insecure)
 }
 
 type client struct {

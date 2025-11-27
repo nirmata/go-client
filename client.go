@@ -639,6 +639,7 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 }
 
 // sendRaw sends an HTTP request and returns the raw response without processing
+// The caller is responsible for closing the response body.
 func (c *client) sendAndGetRawResponse(request *http.Request) (*http.Response, error) {
 	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
 	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
@@ -648,7 +649,6 @@ func (c *client) sendAndGetRawResponse(request *http.Request) (*http.Response, e
 		return resp, err
 	}
 
-	defer resp.Body.Close()
 	klog.V(3).Infof("HTTP response status=%s", resp.Status)
 	return resp, nil
 }

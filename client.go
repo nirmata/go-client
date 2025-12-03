@@ -32,8 +32,6 @@ type Client interface {
 	// Returns the configured URL address
 	Address() string
 
-	APIKey() string
-
 	// Get retrieves all data for a single Object
 	Get(id ID, opts *GetOptions) (map[string]interface{}, Error)
 
@@ -80,8 +78,16 @@ type Client interface {
 	// Post is used to create a new model object.
 	Post(rr *RESTRequest) (map[string]interface{}, Error)
 
+	// PostAndGetRawResponse is used to send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// The response is returned as a raw HTTP response.
+	PostAndGetRawResponse(rr *RESTRequest) (*http.Response, error)
+
 	// Post is used to create a new model object. The contentType is assumed to be JSON. The queryParams is optional.
 	PostFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (map[string]interface{}, Error)
+
+	// PostAndGetRawResponseFromJSON is used send a request to a custom REST endpoint. The contentType is assumed to be JSON. The queryParams is optional.
+	// The response is returned as a raw HTTP response.
+	PostAndGetRawResponseFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error)
 
 	// Post is used to create resources or call a custom REST endpoint. The contentType is assumed to be YAML.
 	// The path and queryParams are optional
@@ -102,11 +108,8 @@ type Client interface {
 	// Options is used to execute an HTTP OPTIONS request
 	Options(service Service, url string) (map[string]interface{}, Error)
 
-	// SetJWTToken sets the JWT token to be used for subsequent requests
-	SetJWTToken(jwtToken string)
-
-	// FetchJWTToken fetches a new JWT token
-	FetchJWTToken() (string, Error)
+	// SetAuth sets the authentication provider to be used for subsequent requests
+	SetAuth(auth AuthProvider)
 }
 
 // GetOptions contains optional paramameters used when retrieving objects
@@ -131,8 +134,8 @@ func NewGetModelID(fields []string, query Query) *GetOptions {
 	return &GetOptions{allFields, query, OutputModeNone}
 }
 
-// NewClient creates a new Client
-func NewClient(address string, token string, insecure bool) Client {
+// NewClientWithAuth creates a new Client with the specified authentication provider
+func NewClient(address string, auth AuthProvider, insecure bool) Client {
 	httpClient := &http.Client{}
 	if insecure {
 		httpClient.Transport = &http.Transport{
@@ -141,28 +144,28 @@ func NewClient(address string, token string, insecure bool) Client {
 	}
 
 	return &client{
-		address:    address,
-		apiToken:   token,
-		httpClient: httpClient,
+		address:      address,
+		authProvider: auth,
+		httpClient:   httpClient,
 	}
 }
 
-func NewClientWithJWT(address string, apiToken string, insecure bool) Client {
-	baseClient := NewClient(address, apiToken, insecure)
-	jwtToken, err := baseClient.FetchJWTToken()
-	if err != nil {
-		klog.Errorf("failed to fetch JWT token: %v", err)
-		return nil
-	}
-	baseClient.SetJWTToken(jwtToken)
-	return baseClient
+func NewClientWithAPIKey(address string, apiKey string, insecure bool) Client {
+	return NewClient(address, NewAPITokenAuth(apiKey), insecure)
+}
+
+func NewClientWithJWTToken(address string, jwtToken string, insecure bool) Client {
+	return NewClient(address, NewJWTTokenAuth(jwtToken), insecure)
+}
+
+func NewClientWithServiceAccountToken(address string, serviceAccountToken string, clientid string, insecure bool) Client {
+	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken, address, clientid), insecure)
 }
 
 type client struct {
-	address    string
-	apiToken   string
-	jwtToken   string
-	httpClient *http.Client
+	address      string
+	authProvider AuthProvider
+	httpClient   *http.Client
 }
 
 func (c *client) Address() string {
@@ -539,6 +542,15 @@ func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
 	return c.send(req)
 }
 
+func (c *client) PostAndGetRawResponse(rr *RESTRequest) (*http.Response, error) {
+	req, err := c.buildRequest("POST", rr)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.sendAndGetRawResponse(req)
+}
+
 func (c *client) Put(rr *RESTRequest) (map[string]interface{}, Error) {
 	req, err := c.buildRequest("PUT", rr)
 	if err != nil {
@@ -626,6 +638,21 @@ func (c *client) buildRequest(method string, rr *RESTRequest) (*http.Request, Er
 	return req, nil
 }
 
+// sendRaw sends an HTTP request and returns the raw response without processing
+// The caller is responsible for closing the response body.
+func (c *client) sendAndGetRawResponse(request *http.Request) (*http.Response, error) {
+	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
+	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
+
+	resp, err := c.httpClient.Do(request)
+	if err != nil {
+		return resp, err
+	}
+
+	klog.V(3).Infof("HTTP response status=%s", resp.Status)
+	return resp, nil
+}
+
 func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 	klog.V(3).Infof("HTTP request method=%s URL=%s", request.Method, request.URL.String())
 	klog.V(3).Infof("HTTP request body=%s", dumpRequest(request))
@@ -676,6 +703,23 @@ func (c *client) PostFromJSON(service Service, path string, jsonMap map[string]i
 	}
 
 	return c.Post(req)
+}
+
+func (c *client) PostAndGetRawResponseFromJSON(service Service, path string, jsonMap map[string]interface{}, queryParams map[string]string) (*http.Response, error) {
+	b, err := json.Marshal(jsonMap)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &RESTRequest{
+		Service:     service,
+		Path:        path,
+		ContentType: "application/json",
+		QueryParams: queryParams,
+		Data:        b,
+	}
+
+	return c.PostAndGetRawResponse(req)
 }
 
 func (c *client) PostWithID(id ID, path string, data []byte, queryParams map[string]string) (map[string]interface{}, Error) {
@@ -815,29 +859,15 @@ func (c *client) getState(id ID, fieldIndex string) (interface{}, Error) {
 	return stateValue, nil
 }
 
-func (c *client) APIKey() string {
-	return c.apiToken
+func (c *client) SetAuth(auth AuthProvider) {
+	c.authProvider = auth
 }
 
 func (c *client) SetAuthorizationHeader(req *http.Request) Error {
-	if c.jwtToken == "" {
-		// Authenticate with API token
-		req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", c.apiToken))
-		return nil
+	if c.authProvider == nil {
+		return NewError("ErrorInternal", "No auth provider configured", nil)
 	}
-
-	if IsJwtTokenExpired(c.jwtToken) {
-		// Refresh JWT token
-		jwtToken, err := c.FetchJWTToken()
-		if err != nil {
-			klog.Errorf("failed to fetch JWT token: %v", err)
-			return err
-		}
-		c.SetJWTToken(jwtToken)
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.jwtToken))
-	return nil
+	return c.authProvider.SetAuthHeader(req)
 }
 
 func (c *client) FetchJWTToken() (string, Error) {
@@ -859,8 +889,4 @@ func (c *client) FetchJWTToken() (string, Error) {
 	}
 
 	return "", NewError("ErrorHTTP", "No JWT token found", nil)
-}
-
-func (c *client) SetJWTToken(jwtToken string) {
-	c.jwtToken = jwtToken
 }

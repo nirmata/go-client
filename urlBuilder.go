@@ -47,7 +47,7 @@ func (ub *urlBldr) ToService(s Service) URLBuilder {
 		ub.paths = append(ub.paths, s.Name())
 	}
 	ub.paths = append(ub.paths, s.Name())
-	if s != ServiceLLMAPPS {
+	if s != ServiceLLMApps {
 		ub.paths = append(ub.paths, "api")
 	}
 	return ub

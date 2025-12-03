@@ -102,11 +102,11 @@ func main() {
 		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 		// Method 1: Convenience constructor
-		c1 := client.NewClientWithServiceAccountToken(address, saToken, false)
+		c1 := client.NewClientWithServiceAccountToken(address, saToken, "client-id", false)
 		fmt.Println("   ✓ Client created using NewClientWithServiceAccountToken()")
 
 		// Method 2: Using auth provider
-		saAuth := client.NewServiceAccountTokenAuth(saToken)
+		saAuth := client.NewServiceAccountTokenAuth(saToken, address, "client-id")
 		c2 := client.NewClient(address, saAuth, false)
 		fmt.Println("   ✓ Client created using NewClient() with ServiceAccountTokenAuth")
 

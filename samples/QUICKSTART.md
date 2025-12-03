@@ -50,14 +50,14 @@ client := client.NewClient(address, auth, false)
 import "github.com/nirmata/go-client"
 
 // Quick way
-client := client.NewClientWithServiceAccountToken(address, saToken, false)
+client := client.NewClientWithServiceAccountToken(address, saToken, "client-id", false)
 
 // Explicit way
-auth := client.NewServiceAccountTokenAuth(saToken)
+auth := client.NewServiceAccountTokenAuth(saToken, address, "client-id")
 client := client.NewClient(address, auth, false)
 ```
 
-**Header Format:** `Authorization: Bearer {token}` (extensible)
+**Header Format:** `Authorization: Bearer {token}` (automatically exchanges SA token for JWT)
 
 ### 4. Switch Authentication at Runtime
 
@@ -70,7 +70,7 @@ jwtAuth := client.NewJWTTokenAuth(jwtToken)
 client.SetAuth(jwtAuth)
 
 // Switch to Service Account
-saAuth := client.NewServiceAccountTokenAuth(saToken)
+saAuth := client.NewServiceAccountTokenAuth(saToken, address, "client-id")
 client.SetAuth(saAuth)
 ```
 

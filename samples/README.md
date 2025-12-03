@@ -68,7 +68,7 @@ client := client.NewClientWithAPIKey(address, apiToken, false)
 client := client.NewClientWithJWTToken(address, jwtToken, false)
 
 // With service account token
-client := client.NewClientWithServiceAccountToken(address, saToken, false)
+client := client.NewClientWithServiceAccountToken(address, saToken, "client-id", false)
 
 // With custom auth provider
 auth := client.NewAPITokenAuth(token)

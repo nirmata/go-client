@@ -20,11 +20,11 @@ func main() {
 
 	// Method 1: Using the convenience constructor (recommended)
 	fmt.Println("Creating client with service account token (Method 1)...")
-	client1 := client.NewClientWithServiceAccountToken(address, saToken, false)
+	client1 := client.NewClientWithServiceAccountToken(address, saToken, "client-id", false)
 
 	// Method 2: Using the base constructor with auth provider
 	fmt.Println("Creating client with service account token (Method 2)...")
-	saAuth := client.NewServiceAccountTokenAuth(saToken)
+	saAuth := client.NewServiceAccountTokenAuth(saToken, address, "client-id")
 	client2 := client.NewClient(address, saAuth, false)
 
 	// Verify the clients work

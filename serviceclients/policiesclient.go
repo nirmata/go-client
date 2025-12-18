@@ -21,7 +21,7 @@ func NewPoliciesClient(address string, auth client.AuthProvider, insecure bool) 
 }
 
 func (c *PoliciesClient) GetGithubAppAccessToken(installationOwner string) (*GithubAppAccessToken, error) {
-	res, _, reqErr := c.Client.GetURL(client.ServicePolicies, "github/accessToken/"+installationOwner)
+	res, _, reqErr := c.Client.GetURL(client.ServicePolicies, "github/accessToken?installationOwner="+installationOwner)
 	if reqErr != nil {
 		return nil, fmt.Errorf("failed to get github app access token: %w", reqErr)
 	}

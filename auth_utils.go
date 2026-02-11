@@ -4,10 +4,9 @@ import (
 	"k8s.io/klog/v2"
 )
 
-func exchangeServiceAccountTokenForJWTToken(serviceAccountToken string, address string, clientid string) (string, Error) {
+func exchangeServiceAccountTokenForJWTToken(serviceAccountToken string, address string, clientid string, insecure bool) (string, Error) {
 	// Create a client with NullAuth since this endpoint doesn't require authentication
-	// Use insecure=true for internal Kubernetes service communication where certificates may be self-signed
-	c := NewClient(address, NewNullAuth(), true)
+	c := NewClient(address, NewNullAuth(), insecure)
 
 	klog.V(3).Infof("Exchanging service account token for JWT")
 

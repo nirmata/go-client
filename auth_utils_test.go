@@ -11,7 +11,7 @@ func TestExchangeServiceAccountTokenForJWTToken_Success(t *testing.T) {
 	clientID := "clientId"
 
 	// Test the function with real server
-	token, err := exchangeServiceAccountTokenForJWTToken(serviceAccountToken, address, clientID)
+	token, err := exchangeServiceAccountTokenForJWTToken(serviceAccountToken, address, clientID, false)
 
 	// Verify the result
 	if err != nil {

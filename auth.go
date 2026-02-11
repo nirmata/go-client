@@ -40,6 +40,7 @@ type ServiceAccountTokenAuth struct {
 	Address             string
 	serviceAccountToken string
 	clientid            string
+	insecure            bool
 
 	/*The JWT token is fetched using the
 	service account token and is short lived
@@ -48,12 +49,13 @@ type ServiceAccountTokenAuth struct {
 	mu       sync.Mutex
 }
 
-func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clientid string) AuthProvider {
+func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clientid string, insecure bool) AuthProvider {
 	return &ServiceAccountTokenAuth{
 		serviceAccountToken: serviceAccountToken,
 		Address:             address,
 		jwtToken:            "",
 		clientid:            clientid,
+		insecure:            insecure,
 	}
 }
 
@@ -74,7 +76,7 @@ func (a *ServiceAccountTokenAuth) SetAuthHeader(req *http.Request) Error {
 }
 
 func (a *ServiceAccountTokenAuth) fetchJWTToken() (string, Error) {
-	return exchangeServiceAccountTokenForJWTToken(a.serviceAccountToken, a.Address, a.clientid)
+	return exchangeServiceAccountTokenForJWTToken(a.serviceAccountToken, a.Address, a.clientid, a.insecure)
 }
 
 // NullAuth implements AuthProvider for no authentication

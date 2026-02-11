@@ -159,7 +159,7 @@ func NewClientWithJWTToken(address string, jwtToken string, insecure bool) Clien
 }
 
 func NewClientWithServiceAccountToken(address string, serviceAccountToken string, clientid string, insecure bool) Client {
-	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken, address, clientid), insecure)
+	return NewClient(address, NewServiceAccountTokenAuth(serviceAccountToken, address, clientid, insecure), insecure)
 }
 
 type client struct {

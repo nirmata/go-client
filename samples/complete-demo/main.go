@@ -106,7 +106,7 @@ func main() {
 		fmt.Println("   ✓ Client created using NewClientWithServiceAccountToken()")
 
 		// Method 2: Using auth provider
-		saAuth := client.NewServiceAccountTokenAuth(saToken, address, "client-id")
+		saAuth := client.NewServiceAccountTokenAuth(saToken, address, "client-id", false)
 		c2 := client.NewClient(address, saAuth, false)
 		fmt.Println("   ✓ Client created using NewClient() with ServiceAccountTokenAuth")
 

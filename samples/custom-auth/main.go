@@ -100,7 +100,8 @@ func main() {
 	// Note: This will fail unless your backend accepts "Custom-Token" format
 	// This is just to demonstrate the concept
 	fmt.Println("Note: This custom auth format is for demonstration purposes.")
-	fmt.Println("Your backend would need to support the custom header format.\n")
+	fmt.Println("Your backend would need to support the custom header format.")
+	fmt.Println()
 
 	// Example 2: Using RotatingAuth
 	fmt.Println("Example 2: Rotating Token Authentication")

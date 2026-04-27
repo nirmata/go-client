@@ -225,13 +225,12 @@ func (c *client) get(rawURL string) ([]byte, int, Error) {
 		return nil, 0, NewError("ErrorHTTP", fmt.Sprintf("HTTP %s request %s", req.Method, req.URL.String()), err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		klog.V(1).Infof("HTTP %d '%s': %s", resp.StatusCode, resp.Status, string(b))
-		return b, resp.StatusCode, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
-	}
-
 	klog.V(3).Infof("HTTP response status=%s length=%d", resp.Status, len(b))
 	klog.V(5).Infof("HTTP response body=%s", string(b))
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return b, resp.StatusCode, NewError("ErrorHTTP", resp.Status, nil)
+	}
 
 	return b, resp.StatusCode, nil
 }
@@ -296,7 +295,7 @@ func (c *client) Get(id ID, opts *GetOptions) (map[string]interface{}, Error) {
 		return obj, nil
 	}
 
-	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrorHTTP", resp.Status, nil)
 }
 
 func (c *client) GetRelationID(id ID, name string) (ID, Error) {
@@ -364,7 +363,7 @@ func (c *client) getRelationData(id ID, name string) ([]byte, Error) {
 		return b, nil
 	}
 
-	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrorHTTP", resp.Status, nil)
 
 }
 
@@ -413,7 +412,7 @@ func (c *client) GetDescendants(id ID, path string, opts *GetOptions) ([]map[str
 		return parseBody, nil
 	}
 
-	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrorHTTP", resp.Status, nil)
 }
 
 func (c *client) GetDescendant(id ID, path string, opts *GetOptions) (map[string]interface{}, Error) {
@@ -482,7 +481,7 @@ func (c *client) delete(u string) Error {
 		return nil
 	}
 
-	return NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return NewError("ErrorHTTP", resp.Status, nil)
 }
 
 func (c *client) GetCollection(service Service, modelIndex string, opts *GetOptions) ([]map[string]interface{}, Error) {
@@ -530,7 +529,7 @@ func (c *client) GetCollection(service Service, modelIndex string, opts *GetOpti
 		return body, nil
 	}
 
-	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrorHTTP", resp.Status, nil)
 }
 
 func (c *client) Post(rr *RESTRequest) (map[string]interface{}, Error) {
@@ -684,7 +683,7 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 		return obj, nil
 	}
 
-	return nil, NewError("ErrorHTTP", fmt.Sprintf("%s: %s", resp.Status, string(b)), nil)
+	return nil, NewError("ErrorHTTP", resp.Status, nil)
 }
 
 func dumpRequest(request *http.Request) string {

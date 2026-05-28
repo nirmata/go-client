@@ -75,12 +75,24 @@ func (c *UsersClient) GetCurrentUserWithAPIKey(apiKey string) (User, error) {
 	}, nil
 }
 
-// GetUserByAPIKey retrieves a user by API key using service-to-service authentication
+// GetUserByAPIKey retrieves a user by API key using service-to-service
+// authentication. The default InsecureSkipVerify HTTP client is used.
+// Use GetUserByAPIKeyWithConfig to supply a custom HTTP client (e.g. SPIRE mTLS).
 func GetUserByAPIKey(apiKey string, address string) (User, error) {
-	serviceClient, err := client.NewServiceClient(client.ServiceClientConfig{
+	return GetUserByAPIKeyWithConfig(apiKey, client.ServiceClientConfig{
 		Service: client.ServiceUsers,
 		Address: address,
 	})
+}
+
+// GetUserByAPIKeyWithConfig retrieves a user by API key using the provided
+// ServiceClientConfig. Set ServiceClientConfig.HTTPClient to inject a custom
+// transport such as a SPIRE mTLS RoundTripper.
+func GetUserByAPIKeyWithConfig(apiKey string, config client.ServiceClientConfig) (User, error) {
+	if config.Service == 0 {
+		config.Service = client.ServiceUsers
+	}
+	serviceClient, err := client.NewServiceClient(config)
 	if err != nil {
 		return User{}, fmt.Errorf("failed to create service client: %w", err)
 	}

@@ -103,7 +103,7 @@ func (sc *ServiceClient) Get(path string) ([]byte, int, Error) {
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("%s %s", ServiceAccountAuthScheme, sc.saToken))
-	klog.V(3).Infof("ServiceClient GET %s", url)
+	klog.V(3).Infof("ServiceClient GET %s", strings.SplitN(url, "?", 2)[0])
 	return sc.doRequest(req)
 }
 
@@ -119,7 +119,7 @@ func (sc *ServiceClient) Post(path string, contentType string, data []byte) ([]b
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	klog.V(3).Infof("ServiceClient POST %s", url)
+	klog.V(3).Infof("ServiceClient POST %s", strings.SplitN(url, "?", 2)[0])
 	return sc.doRequest(req)
 }
 
@@ -135,7 +135,7 @@ func (sc *ServiceClient) Put(path string, contentType string, data []byte) ([]by
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
-	klog.V(3).Infof("ServiceClient PUT %s", url)
+	klog.V(3).Infof("ServiceClient PUT %s", strings.SplitN(url, "?", 2)[0])
 	return sc.doRequest(req)
 }
 
@@ -148,7 +148,7 @@ func (sc *ServiceClient) Delete(path string) ([]byte, int, Error) {
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("%s %s", ServiceAccountAuthScheme, sc.saToken))
-	klog.V(3).Infof("ServiceClient DELETE %s", url)
+	klog.V(3).Infof("ServiceClient DELETE %s", strings.SplitN(url, "?", 2)[0])
 	return sc.doRequest(req)
 }
 

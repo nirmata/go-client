@@ -148,7 +148,7 @@ func (sc *ServiceClient) Delete(path string) ([]byte, int, Error) {
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("%s %s", ServiceAccountAuthScheme, sc.saToken))
-	klog.V(3).Infof("ServiceClient DELETE %s", strings.SplitN(url, "?", 2)[0])
+	klog.V(3).Infof("ServiceClient DELETE service=%s", sc.service.Name())
 	return sc.doRequest(req)
 }
 

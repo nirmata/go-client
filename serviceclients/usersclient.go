@@ -28,9 +28,7 @@ func NewUsersClient(address string, auth client.AuthProvider, insecure bool) *Us
 func (c *UsersClient) GetCurrentUserWithAPIKey(apiKey string) (User, error) {
 	fields := []string{"name", "email", "role", "id", "parent"}
 
-	urlEncodedAPIKey := url.QueryEscape(apiKey)
-
-	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
+	query := client.NewQuery().FieldEqualsValue("apiKey", apiKey)
 	users, err := c.Client.GetCollection(client.ServiceUsers, "users", client.NewGetOptions(fields, query))
 	if err != nil {
 		return User{}, fmt.Errorf("failed to get current user: %w", err)
@@ -98,8 +96,7 @@ func GetUserByAPIKeyWithConfig(apiKey string, config client.ServiceClientConfig)
 	}
 
 	fields := []string{"name", "email", "role", "id", "parent"}
-	urlEncodedAPIKey := url.QueryEscape(apiKey)
-	query := client.NewQuery().FieldEqualsValue("apiKey", urlEncodedAPIKey)
+	query := client.NewQuery().FieldEqualsValue("apiKey", apiKey)
 
 	fieldsStr := strings.Join(fields, ", ")
 	fieldsEncoded := url.QueryEscape(fieldsStr)

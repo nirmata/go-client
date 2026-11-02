@@ -64,6 +64,27 @@ func TestDumpRequestRedactsCredentialHeadersAndPreservesRequest(t *testing.T) {
 	}
 }
 
+func TestDumpRequestRedactsNonCanonicalHeaderKeys(t *testing.T) {
+	req, err := http.NewRequest(http.MethodGet, "http://example.invalid", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Direct map assignment skips key canonicalization.
+	req.Header["authorization"] = []string{"Bearer secret-lower"}
+	req.Header["X-API-KEY"] = []string{"secret-upper"}
+	req.Header["proxy-authorization"] = []string{"Basic secret-proxy"}
+
+	dump := dumpRequest(req)
+	for _, secret := range []string{"secret-lower", "secret-upper", "secret-proxy"} {
+		if strings.Contains(dump, secret) {
+			t.Errorf("dump contains %q:\n%s", secret, dump)
+		}
+	}
+	if got := req.Header["authorization"]; len(got) != 1 || got[0] != "Bearer secret-lower" {
+		t.Errorf("original request header changed: %v", got)
+	}
+}
+
 func makeTestJWT(exp time.Time) string {
 	enc := base64.RawURLEncoding
 	header := enc.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))

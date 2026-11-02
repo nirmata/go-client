@@ -71,11 +71,12 @@ func TestDumpRequestRedactsNonCanonicalHeaderKeys(t *testing.T) {
 	}
 	// Direct map assignment skips key canonicalization.
 	req.Header["authorization"] = []string{"Bearer secret-lower"}
+	req.Header["Authorization"] = []string{"Bearer secret-canonical"} // coexists with the lowercase key
 	req.Header["X-API-KEY"] = []string{"secret-upper"}
 	req.Header["proxy-authorization"] = []string{"Basic secret-proxy"}
 
 	dump := dumpRequest(req)
-	for _, secret := range []string{"secret-lower", "secret-upper", "secret-proxy"} {
+	for _, secret := range []string{"secret-lower", "secret-canonical", "secret-upper", "secret-proxy"} {
 		if strings.Contains(dump, secret) {
 			t.Errorf("dump contains %q:\n%s", secret, dump)
 		}

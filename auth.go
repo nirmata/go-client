@@ -19,7 +19,7 @@ func NewAPITokenAuth(token string) AuthProvider {
 }
 
 func (a *APITokenAuth) SetAuthHeader(req *http.Request) Error {
-	req.Header.Add("Authorization", fmt.Sprintf("NIRMATA-API %s", a.token))
+	req.Header.Set("Authorization", fmt.Sprintf("NIRMATA-API %s", a.token))
 	return nil
 }
 
@@ -32,7 +32,7 @@ func NewJWTTokenAuth(token string) AuthProvider {
 }
 
 func (a *JWTTokenAuth) SetAuthHeader(req *http.Request) Error {
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", a.token))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.token))
 	return nil
 }
 
@@ -60,18 +60,19 @@ func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clie
 }
 
 func (a *ServiceAccountTokenAuth) SetAuthHeader(req *http.Request) Error {
+	a.mu.Lock()
 	if a.jwtToken == "" || IsJwtTokenExpired(a.jwtToken) {
-		a.mu.Lock()
 		jwtToken, err := a.fetchJWTToken()
 		if err != nil {
 			a.mu.Unlock()
 			return NewError("ErrorHTTP", "Failed to fetch JWT token", err)
 		}
 		a.jwtToken = jwtToken
-		a.mu.Unlock()
 	}
+	token := a.jwtToken
+	a.mu.Unlock()
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", a.jwtToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	return nil
 }
 

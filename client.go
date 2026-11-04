@@ -686,8 +686,36 @@ func (c *client) send(request *http.Request) (map[string]interface{}, Error) {
 	return nil, NewError("ErrorHTTP", resp.Status, nil)
 }
 
+// sensitiveDumpHeaders lists headers whose values are redacted in request dumps.
+var sensitiveDumpHeaders = []string{"Authorization", "Proxy-Authorization", "Cookie", "X-Api-Key", "Api-Key"}
+
+func isSensitiveDumpHeader(key string) bool {
+	for _, h := range sensitiveDumpHeaders {
+		if strings.EqualFold(key, h) {
+			return true
+		}
+	}
+	return false
+}
+
+// dumpRequest returns a dump of the request with credential headers redacted.
+// The outgoing request's headers are not modified, and its body is preserved.
 func dumpRequest(request *http.Request) string {
-	requestDump, _ := httputil.DumpRequest(request, true)
+	r := *request
+	r.Header = make(http.Header, len(request.Header))
+	for k, v := range request.Header {
+		// Match case-insensitively: a key assigned directly to the map need not be canonical.
+		if isSensitiveDumpHeader(k) {
+			r.Header[k] = []string{"[REDACTED]"}
+			continue
+		}
+		r.Header[k] = append([]string(nil), v...)
+	}
+
+	requestDump, _ := httputil.DumpRequest(&r, true)
+	// DumpRequest consumes the body and replaces it on the copy; hand the
+	// replacement back to the original so the full body is still sent.
+	request.Body = r.Body
 	return string(requestDump)
 }
 

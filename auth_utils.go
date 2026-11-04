@@ -6,8 +6,12 @@ import (
 
 func exchangeServiceAccountTokenForJWTToken(serviceAccountToken string, address string, clientid string, insecure bool) (string, Error) {
 	// Create a client with NullAuth since this endpoint doesn't require authentication
-	c := NewClient(address, NewNullAuth(), insecure)
+	return exchangeServiceAccountToken(NewClient(address, NewNullAuth(), insecure), serviceAccountToken, clientid)
+}
 
+// exchangeServiceAccountToken exchanges the token using c, which must not add
+// authentication of its own.
+func exchangeServiceAccountToken(c Client, serviceAccountToken, clientid string) (string, Error) {
 	klog.V(3).Infof("Exchanging service account token for JWT")
 
 	// Prepare the request data

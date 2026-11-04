@@ -25,6 +25,11 @@ func NewClientWithOptions(address string, auth AuthProvider, opts ClientOptions)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
 		return nil, fmt.Errorf("invalid address %q: must be an absolute http or https URL", address)
 	}
+	// API paths are appended to the raw address, so a query, fragment or
+	// userinfo would swallow them or leak into every request URL.
+	if u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.User != nil {
+		return nil, fmt.Errorf("invalid address %q: must not contain a query, fragment or user info", address)
+	}
 	if auth == nil {
 		return nil, fmt.Errorf("auth provider is required; use NewNullAuth for transport authentication")
 	}

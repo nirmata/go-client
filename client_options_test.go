@@ -107,7 +107,8 @@ func TestClientOptionsDefaultsAndInvalidSettings(t *testing.T) {
 }
 
 func TestNewClientWithOptionsRejectsInvalidAddress(t *testing.T) {
-	for _, address := range []string{"", "one.example", "/api", "ftp://one.example", "https://", "http://:8080"} {
+	for _, address := range []string{"", "one.example", "/api", "ftp://one.example", "https://", "http://:8080",
+		"https://one.example?tenant=one", "https://one.example?", "https://one.example#section", "https://user:pw@one.example"} {
 		if c, err := NewClientWithOptions(address, NewNullAuth(), ClientOptions{}); err == nil || c != nil {
 			t.Errorf("address %q: want error", address)
 		}
@@ -183,5 +184,44 @@ func TestLegacyConstructorsUnchanged(t *testing.T) {
 	}
 	if !c.httpClient.Transport.(*http.Transport).TLSClientConfig.InsecureSkipVerify {
 		t.Fatal("legacy insecure option changed")
+	}
+}
+
+func TestServiceAccountTokenExchangeUsesHTTPClient(t *testing.T) {
+	var paths []string
+	var mu sync.Mutex
+	effective := &http.Client{Transport: optionsRoundTripper(func(r *http.Request) (*http.Response, error) {
+		mu.Lock()
+		paths = append(paths, r.URL.Path)
+		mu.Unlock()
+		if strings.HasSuffix(r.URL.Path, "auth/token") {
+			if r.Header.Get("Authorization") != "" {
+				t.Errorf("token exchange sent Authorization %q", r.Header.Get("Authorization"))
+			}
+			resp := optionsResponse(r)
+			resp.Header.Set("Content-Type", "application/json")
+			resp.Body = io.NopCloser(strings.NewReader(`{"access_token":"exchanged"}`))
+			return resp, nil
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer exchanged" {
+			t.Errorf("API request Authorization = %q", got)
+		}
+		return optionsResponse(r), nil
+	})}
+
+	// The address is unreachable: every request must go through effective.
+	const address = "https://unreachable.invalid"
+	auth := NewServiceAccountTokenAuthWithHTTPClient("sa-token", address, "client", effective)
+	c, err := NewClientWithOptions(address, auth, ClientOptions{HTTPClient: effective})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := c.GetURL(ServiceLLMApps, "chat"); err != nil {
+		t.Fatal(err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(paths) != 2 || !strings.HasSuffix(paths[0], "auth/token") {
+		t.Fatalf("requests through the HTTP client: %v", paths)
 	}
 }

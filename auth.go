@@ -47,6 +47,10 @@ type ServiceAccountTokenAuth struct {
 	*/
 	jwtToken string
 	mu       sync.Mutex
+
+	// httpClient, when set, is used for the token exchange instead of a
+	// client built from insecure.
+	httpClient *http.Client
 }
 
 func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clientid string, insecure bool) AuthProvider {
@@ -56,6 +60,22 @@ func NewServiceAccountTokenAuth(serviceAccountToken string, address string, clie
 		jwtToken:            "",
 		clientid:            clientid,
 		insecure:            insecure,
+	}
+}
+
+// NewServiceAccountTokenAuthWithHTTPClient is like NewServiceAccountTokenAuth,
+// but the token exchange uses httpClient, so it gets the same TLS settings,
+// proxy and transport wrappers as the API requests. Pass the same effective
+// client given to NewClientWithOptions. A nil httpClient uses a default client.
+func NewServiceAccountTokenAuthWithHTTPClient(serviceAccountToken string, address string, clientid string, httpClient *http.Client) AuthProvider {
+	if httpClient == nil {
+		httpClient = &http.Client{}
+	}
+	return &ServiceAccountTokenAuth{
+		serviceAccountToken: serviceAccountToken,
+		Address:             address,
+		clientid:            clientid,
+		httpClient:          httpClient,
 	}
 }
 
@@ -77,6 +97,10 @@ func (a *ServiceAccountTokenAuth) SetAuthHeader(req *http.Request) Error {
 }
 
 func (a *ServiceAccountTokenAuth) fetchJWTToken() (string, Error) {
+	if a.httpClient != nil {
+		c := &client{address: a.Address, authProvider: NewNullAuth(), httpClient: a.httpClient}
+		return exchangeServiceAccountToken(c, a.serviceAccountToken, a.clientid)
+	}
 	return exchangeServiceAccountTokenForJWTToken(a.serviceAccountToken, a.Address, a.clientid, a.insecure)
 }
 

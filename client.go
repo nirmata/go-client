@@ -142,6 +142,8 @@ func NewClient(address string, auth AuthProvider, insecure bool) Client {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 		}
 	}
+	warnInternalNoClientCert(noCertPathNewClient, "NewClient", address,
+		"ClientOptions{HTTPClient} to NewClientWithOptions")
 
 	return &client{
 		address:      address,

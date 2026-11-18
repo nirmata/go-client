@@ -106,15 +106,107 @@ func TestClientOptionsDefaultsAndInvalidSettings(t *testing.T) {
 	}
 }
 
-func TestNewClientWithOptionsRejectsInvalidAddress(t *testing.T) {
-	for _, address := range []string{"", "one.example", "/api", "ftp://one.example", "https://", "http://:8080",
-		"https://one.example?tenant=one", "https://one.example?", "https://one.example#section", "https://user:pw@one.example"} {
-		if c, err := NewClientWithOptions(address, NewNullAuth(), ClientOptions{}); err == nil || c != nil {
-			t.Errorf("address %q: want error", address)
-		}
+func TestNewClientWithOptionsAddressValidation(t *testing.T) {
+	for _, tt := range []struct {
+		address string
+		valid   bool
+	}{
+		{"https://", true},
+		{"http://", true},
+		{"https://one.example", true},
+		{"http://127.0.0.1:8080", true},
+		{"", false},
+		{"one.example", false},
+		{"/api", false},
+		{"ftp://one.example", false},
+		{"ftp://", false},
+		{"https:", false},
+		{"https:///", false},
+		{"https://?", false},
+		{"http://:8080", false},
+		{"https://one.example?tenant=one", false},
+		{"https://one.example?", false},
+		{"https://one.example#section", false},
+		{"https://user:pw@one.example", false},
+	} {
+		t.Run(tt.address, func(t *testing.T) {
+			c, err := NewClientWithOptions(tt.address, NewNullAuth(), ClientOptions{})
+			if tt.valid && (err != nil || c == nil) {
+				t.Fatalf("address %q: want valid, got err=%v", tt.address, err)
+			}
+			if !tt.valid && (err == nil || c != nil) {
+				t.Fatalf("address %q: want error", tt.address)
+			}
+		})
 	}
-	if _, err := NewClientWithOptions("http://127.0.0.1:8080", NewNullAuth(), ClientOptions{}); err != nil {
-		t.Errorf("valid address rejected: %v", err)
+}
+
+// recordingClient returns an *http.Client that records request URLs and answers
+// every request with an empty JSON array.
+func recordingClient(urls *[]string) *http.Client {
+	return &http.Client{Transport: optionsRoundTripper(func(r *http.Request) (*http.Response, error) {
+		*urls = append(*urls, r.Method+" "+r.URL.String())
+		return &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`[]`)), Request: r}, nil
+	})}
+}
+
+func exerciseInternalCalls(t *testing.T, c Client) {
+	t.Helper()
+	if _, _, err := c.GetURL(ServicePolicies, "SlackChannel"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetCollection(ServicePolicies, "SlackChannel", nil); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = c.Put(&RESTRequest{Service: ServicePolicies, Path: "SlackChannel/abc/postMessage",
+		ContentType: "application/json", Data: []byte(`{}`)})
+	if _, _, err := c.GetURL(ServiceUsers, "emails"); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClientOptionsInternalAddressMatchesLegacyURLs(t *testing.T) {
+	for _, tt := range []struct {
+		address string
+		host    string
+	}{
+		{"https://", "https://policies/policies/api/"},
+		{"http://", "http://policies/policies/api/"},
+	} {
+		t.Run(tt.address, func(t *testing.T) {
+			var legacyURLs, optionURLs []string
+			legacy := NewClient(tt.address, NewNullAuth(), false)
+			legacy.(*client).httpClient = recordingClient(&legacyURLs)
+			exerciseInternalCalls(t, legacy)
+
+			opt, err := NewClientWithOptions(tt.address, NewNullAuth(), ClientOptions{HTTPClient: recordingClient(&optionURLs)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			exerciseInternalCalls(t, opt)
+
+			if len(optionURLs) != 4 || strings.Join(optionURLs, "\n") != strings.Join(legacyURLs, "\n") {
+				t.Fatalf("URLs differ:\nlegacy:  %q\noptions: %q", legacyURLs, optionURLs)
+			}
+			if !strings.HasPrefix(strings.TrimPrefix(optionURLs[0], "GET "), tt.host) {
+				t.Fatalf("want per-service DNS form %q, got %q", tt.host, optionURLs[0])
+			}
+		})
+	}
+}
+
+func TestClientOptionsInternalAddressUsesSuppliedHTTPClient(t *testing.T) {
+	var urls []string
+	c, err := NewClientWithOptions("https://", NewJWTTokenAuth("jwt"), ClientOptions{HTTPClient: recordingClient(&urls)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.GetCollection(ServicePolicies, "SlackChannel", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(urls) != 1 || !strings.HasPrefix(urls[0], "GET https://policies/policies/api/SlackChannel") {
+		t.Fatalf("supplied HTTP client not used for internal address: %q", urls)
 	}
 }
 

@@ -71,6 +71,7 @@ func NewServiceClient(config ServiceClientConfig) (*ServiceClient, error) {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
 			},
 		}
+		warnInternalNoClientCert(noCertPathServiceClient, "NewServiceClient", address, "ServiceClientConfig{HTTPClient}")
 	}
 
 	klog.V(2).Infof("Created ServiceClient: target=%s, address=%s", config.Service.Name(), address)

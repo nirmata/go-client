@@ -49,6 +49,9 @@ func NewClientWithOptions(address string, auth AuthProvider, opts ClientOptions)
 		}
 		httpClient.Transport = wrapped
 	}
+	if opts.HTTPClient == nil && opts.WrapTransport == nil {
+		warnInternalNoClientCert(noCertPathClientOptions, "NewClientWithOptions", address, "ClientOptions{HTTPClient}")
+	}
 
 	return &client{address: address, authProvider: auth, httpClient: httpClient}, nil
 }

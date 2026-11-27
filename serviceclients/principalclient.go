@@ -1,19 +1,23 @@
 package serviceclients
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/nirmata/go-client"
 	"k8s.io/klog/v2"
 )
 
-const whoamiPath = "whoami"
+const (
+	whoamiPath       = "whoami"
+	principalTimeout = 30 * time.Second
+	maxPrincipalBody = 1 << 20
+)
 
 // Principal is the caller of an API key as resolved by the users service realm.
 // TenantID is the tenant the credential acts in.
@@ -58,14 +62,12 @@ func GetCurrentPrincipal(apiKey string, cfg PrincipalClientConfig) (Principal, e
 	if address == "" {
 		address = "https://"
 	}
-	name := client.ServiceUsers.Name()
-	base := strings.TrimRight(address, "/")
-	if client.IsInternalBaseURL(address) {
-		base = strings.TrimRight(address, "/") + "/" + name
-	}
-	target := base + "/" + name + "/api/" + whoamiPath
+	// Same builder the other service calls use, so "https://" resolves to https://users/users/api/...
+	target := client.NewURLBuilder(address).ToService(client.ServiceUsers).WithPath(whoamiPath).Build()
 
-	req, err := http.NewRequest(http.MethodGet, target, nil)
+	ctx, cancel := context.WithTimeout(context.Background(), principalTimeout)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return Principal{}, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -74,13 +76,14 @@ func GetCurrentPrincipal(apiKey string, cfg PrincipalClientConfig) (Principal, e
 	}
 	req.Header.Set("Accept", "application/json")
 
-	httpClient := cfg.HTTPClient
-	if httpClient == nil {
-		httpClient = &http.Client{
-			Timeout:   30 * time.Second,
-			Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, //nolint:gosec
-		}
+	var httpClient http.Client
+	if cfg.HTTPClient != nil {
+		httpClient = *cfg.HTTPClient // copy: the caller's client is not modified
+	} else {
+		httpClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec
 	}
+	// The key must never follow a redirect to another host or scheme.
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 
 	klog.V(3).Infof("GetCurrentPrincipal GET %s", target)
 	resp, err := httpClient.Do(req)
@@ -89,17 +92,21 @@ func GetCurrentPrincipal(apiKey string, cfg PrincipalClientConfig) (Principal, e
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxPrincipalBody))
 	if err != nil {
 		return Principal{}, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		if resp.StatusCode == http.StatusNotFound {
-			return Principal{}, fmt.Errorf(
-				"users service does not expose whoami yet; deploy a users release that serves /users/api/whoami (status: %d)",
-				resp.StatusCode)
-		}
+	switch {
+	case resp.StatusCode >= 200 && resp.StatusCode <= 299:
+	case resp.StatusCode == http.StatusNotFound:
+		return Principal{}, fmt.Errorf(
+			"users service does not expose whoami yet; deploy a newer users service (status: %d)", resp.StatusCode)
+	case resp.StatusCode >= 300 && resp.StatusCode <= 399:
+		return Principal{}, fmt.Errorf("users redirected the request; redirects are refused (status: %d)", resp.StatusCode)
+	case resp.StatusCode >= 500:
+		return Principal{}, fmt.Errorf("users service error: %s (status: %d)", resp.Status, resp.StatusCode)
+	default:
 		return Principal{}, fmt.Errorf("users rejected the credential: %s (status: %d)", resp.Status, resp.StatusCode)
 	}
 

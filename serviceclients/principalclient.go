@@ -109,8 +109,10 @@ func GetCurrentPrincipal(apiKey string, cfg PrincipalClientConfig) (Principal, e
 		return Principal{}, fmt.Errorf("users redirected the request; redirects are refused (status: %d)", resp.StatusCode)
 	case resp.StatusCode >= 500:
 		return Principal{}, fmt.Errorf("users service error: %s (status: %d)", resp.Status, resp.StatusCode)
-	default:
+	case resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden:
 		return Principal{}, fmt.Errorf("users rejected the credential: %s (status: %d)", resp.Status, resp.StatusCode)
+	default:
+		return Principal{}, fmt.Errorf("unexpected response from users service: %s (status: %d)", resp.Status, resp.StatusCode)
 	}
 
 	var p principalResponse

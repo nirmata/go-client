@@ -86,6 +86,9 @@ func TestGetCurrentPrincipalErrors(t *testing.T) {
 		{"unauthorized", http.StatusUnauthorized, "users rejected the credential"},
 		{"forbidden", http.StatusForbidden, "users rejected the credential"},
 		{"old users image", http.StatusNotFound, "does not expose whoami"},
+		{"rate limited", http.StatusTooManyRequests, "unexpected response from users service"},
+		{"request timeout", http.StatusRequestTimeout, "unexpected response from users service"},
+		{"bad request", http.StatusBadRequest, "unexpected response from users service"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -36,7 +36,7 @@ type PrincipalClientConfig struct {
 	// Address is the base URL. "https://" selects the in-cluster users service.
 	Address string
 	// HTTPClient overrides the default client, for example a SPIRE mTLS transport.
-	// When nil, a client with InsecureSkipVerify=true is used, as ServiceClient does.
+	// When nil, certificates are verified, except for the in-cluster address, as ServiceClient does.
 	HTTPClient *http.Client
 }
 
@@ -77,11 +77,14 @@ func GetCurrentPrincipal(apiKey string, cfg PrincipalClientConfig) (Principal, e
 	req.Header.Set("Accept", "application/json")
 
 	var httpClient http.Client
-	if cfg.HTTPClient != nil {
+	switch {
+	case cfg.HTTPClient != nil:
 		httpClient = *cfg.HTTPClient // copy: the caller's client is not modified
-	} else {
+	case client.IsInternalBaseURL(address):
+		// The in-cluster users service presents a cluster-internal certificate (same as ServiceClient).
 		httpClient.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec
 	}
+	// Any other address uses http.DefaultTransport, which verifies the certificate the key is sent to.
 	// The key must never follow a redirect to another host or scheme.
 	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 

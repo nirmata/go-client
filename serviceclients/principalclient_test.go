@@ -43,6 +43,24 @@ func TestGetCurrentPrincipal(t *testing.T) {
 	}
 }
 
+func TestGetCurrentPrincipalVerifiesExternalCertificate(t *testing.T) {
+	called := false
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, _ = w.Write([]byte(`{"id":"u1","tenantId":"t1"}`))
+	}))
+	defer srv.Close()
+
+	// No HTTPClient: an untrusted certificate on an external address must be refused before the key is sent.
+	_, err := GetCurrentPrincipal(testKey, PrincipalClientConfig{Address: srv.URL})
+	if err == nil || !strings.Contains(err.Error(), "certificate") {
+		t.Fatalf("err = %v, want a certificate verification error", err)
+	}
+	if called {
+		t.Error("request reached a server whose certificate was not trusted")
+	}
+}
+
 func TestGetCurrentPrincipalKeyNeverInURL(t *testing.T) {
 	var gotURI string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

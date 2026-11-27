@@ -25,6 +25,10 @@ func NewUsersClient(address string, auth client.AuthProvider, insecure bool) *Us
 	return &UsersClient{Client: client.NewClient(address, auth, insecure)}
 }
 
+// GetCurrentUserWithAPIKey looks up the user whose apiKey matches.
+//
+// Deprecated: use GetCurrentPrincipal. This queries User by apiKey, which bypasses the users
+// service API-key realm (expiry, rotation, acting tenant) and puts the key in the request URL.
 func (c *UsersClient) GetCurrentUserWithAPIKey(apiKey string) (User, error) {
 	fields := []string{"name", "email", "role", "id", "parent"}
 
@@ -76,6 +80,9 @@ func (c *UsersClient) GetCurrentUserWithAPIKey(apiKey string) (User, error) {
 // GetUserByAPIKey retrieves a user by API key using service-to-service
 // authentication. The default InsecureSkipVerify HTTP client is used.
 // Use GetUserByAPIKeyWithConfig to supply a custom HTTP client (e.g. SPIRE mTLS).
+//
+// Deprecated: use GetCurrentPrincipal. This queries User by apiKey, which bypasses the users
+// service API-key realm (expiry, rotation, acting tenant) and puts the key in the request URL.
 func GetUserByAPIKey(apiKey string, address string) (User, error) {
 	return GetUserByAPIKeyWithConfig(apiKey, client.ServiceClientConfig{
 		Service: client.ServiceUsers,
@@ -86,6 +93,9 @@ func GetUserByAPIKey(apiKey string, address string) (User, error) {
 // GetUserByAPIKeyWithConfig retrieves a user by API key using the provided
 // ServiceClientConfig. Set ServiceClientConfig.HTTPClient to inject a custom
 // transport such as a SPIRE mTLS RoundTripper.
+//
+// Deprecated: use GetCurrentPrincipal. This queries User by apiKey, which bypasses the users
+// service API-key realm (expiry, rotation, acting tenant) and puts the key in the request URL.
 func GetUserByAPIKeyWithConfig(apiKey string, config client.ServiceClientConfig) (User, error) {
 	if config.Service == 0 {
 		config.Service = client.ServiceUsers
